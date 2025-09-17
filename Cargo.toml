@@ -2,5 +2,17 @@
 name = "unnamed"
 version = "0.0.0"
 edition = "2024"
+build = "build.rs"
+
+[build-dependencies]
+chrono = "0.4"
 
 [dependencies]
+# EGUI
+eframe = "0.32"
+egui = { version = "0.32", features = ["log"] }
+# Concurrency
+parking_lot = "0.12"
+# Logging
+log = "0.4"
+simplelog = "0.12"

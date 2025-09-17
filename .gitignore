@@ -1,1 +1,6 @@
+# Rust build files
 /target
+
+# Enviroment variables
+.env
+.envrc
