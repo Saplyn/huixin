@@ -13,6 +13,7 @@ eframe = "0.32"
 egui = { version = "0.32", features = ["log"] }
 # Concurrency
 parking_lot = "0.12"
+dashmap = "7.0.0-rc2"
 # Logging
 log = "0.4"
 simplelog = "0.12"

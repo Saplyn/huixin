@@ -1,20 +1,17 @@
-use std::thread;
-
 use simplelog::TermLogger;
 
-use crate::app::App;
+use crate::app::prepare_app;
 
 mod app;
 mod metronome;
+mod sheet;
+mod sheet_reader;
 mod ui;
 
 fn main() -> eframe::Result {
     init_logger().expect("Fail to start logger");
 
-    let app = App::new();
-    let metronome = app.metronome.clone();
-    thread::spawn(move || metronome::main(metronome));
-
+    let app = prepare_app();
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
         "Unnamed App",

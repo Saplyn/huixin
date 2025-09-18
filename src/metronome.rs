@@ -1,7 +1,14 @@
-use std::{cmp, sync::Arc, thread, time::Duration};
+use std::{
+    cmp,
+    sync::{Arc, mpsc},
+    thread,
+    time::Duration,
+};
 
-use log::debug;
+use log::{debug, error};
 use parking_lot::RwLock;
+
+use crate::ui::main::UICmd;
 
 const TICK_PER_BEAT: u32 = 4;
 const SLEEP_PER_INTERVAL: u32 = 100;
@@ -15,8 +22,8 @@ pub struct Metronome {
     pub top_tick: RwLock<Option<u64>>,
 }
 
-impl Default for Metronome {
-    fn default() -> Self {
+impl Metronome {
+    pub fn new() -> Self {
         Self {
             playing: RwLock::new(false),
             bpm: RwLock::new(130.),
@@ -34,7 +41,17 @@ fn bpm_to_tickable(bpm: f64) -> (Duration, Duration) {
     )
 }
 
-pub fn main(state: Arc<Metronome>) {
+pub fn main(state: Arc<Metronome>, ui_cmd_tx: mpsc::Sender<UICmd>) {
+    thread::spawn(|| actual_main(state)).join().unwrap_err();
+    error!("Metronome panicked");
+    ui_cmd_tx
+        .send(UICmd::ShowError(
+            "Metronome thread unexpectedly panicked".to_string(),
+        ))
+        .expect("Failed to request error to be displayed on UI");
+}
+
+fn actual_main(state: Arc<Metronome>) -> ! {
     let (mut interval, mut sleep_time) = bpm_to_tickable(*state.bpm.read());
     let mut remaining = interval;
     let mut active_bpm = *state.bpm.read();

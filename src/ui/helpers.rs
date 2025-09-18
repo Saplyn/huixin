@@ -1,4 +1,4 @@
-use std::{ffi::os_str::Display, fmt};
+use std::fmt;
 
 // LYN: Widget ID
 
@@ -6,6 +6,7 @@ use std::{ffi::os_str::Display, fmt};
 pub enum WidgetId {
     MainAppTopToolBar,
     MainAppButtonStatusBar,
+    WarningModal,
 }
 
 impl From<WidgetId> for egui::Id {

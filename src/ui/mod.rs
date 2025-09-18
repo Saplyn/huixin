@@ -1,5 +1,3 @@
-use crate::app::App;
-
 pub mod composer;
 pub mod helpers;
 pub mod main;

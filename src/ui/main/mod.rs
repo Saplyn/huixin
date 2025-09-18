@@ -1,22 +1,51 @@
-use std::ops::DerefMut;
+use std::{ops::DerefMut, sync::mpsc};
 
 use crate::{
     app::App,
     ui::{
         helpers::{AppPage, PageId, WidgetId},
-        main::performance::Performance,
+        main::{error_modal::ErrorModal, performance::Performance},
     },
 };
 
+mod error_modal;
 mod performance;
 
 // LYN: UI State Holder
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct UI {
+    pub cmd_tx: mpsc::Sender<UICmd>,
+    pub cmd_rx: mpsc::Receiver<UICmd>,
     pub active_page: PageId,
     pub pages: Vec<Box<dyn AppPage>>,
     pub performance: Performance,
+    pub error_modal: ErrorModal,
+}
+
+// LYN: UI Command
+
+pub enum UICmd {
+    ShowError(String),
+}
+
+impl App {
+    fn handle_ui_cmd(&mut self) {
+        let cmd = match self.ui.cmd_rx.try_recv() {
+            Ok(cmd) => cmd,
+            Err(mpsc::TryRecvError::Empty) => return,
+            Err(mpsc::TryRecvError::Disconnected) => {
+                self.ui
+                    .error_modal
+                    .set_msg("UI command channel unexpectedly closed".to_string());
+                return;
+            }
+        };
+
+        match cmd {
+            UICmd::ShowError(msg) => self.ui.error_modal.set_msg(msg),
+        }
+    }
 }
 
 // LYN: UI Implementation
@@ -27,8 +56,11 @@ impl eframe::App for App {
             .performance
             .update_frame_history(ctx.input(|i| i.time), frame.info().cpu_usage);
 
+        self.handle_ui_cmd();
+
         self.draw_ui(ctx, frame);
         self.draw_active_app(ctx, frame);
+        self.ui.error_modal.try_draw(ctx);
     }
 }
 
