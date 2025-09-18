@@ -1,4 +1,4 @@
-use crate::app::helpers::{AppPage, PageId};
+use crate::apps::helpers::{AppPage, PageId};
 
 #[derive(Debug, Default)]
 pub struct Tester {}

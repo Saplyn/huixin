@@ -8,7 +8,7 @@ use std::{
 use log::{debug, error, info};
 use parking_lot::RwLock;
 
-use crate::app::main::MainAppCmd;
+use crate::apps::main::MainAppCmd;
 
 const TICK_PER_BEAT: u32 = 4;
 const SLEEP_PER_INTERVAL: u32 = 100;
@@ -35,17 +35,19 @@ impl Metronome {
 
 // LYN: Main
 
-pub fn main(state: Arc<Metronome>, cmd_tx: mpsc::Sender<MainAppCmd>) {
-    thread::spawn(|| actual_main(state)).join().unwrap_err();
-    error!("Metronome panicked");
-    cmd_tx
-        .send(MainAppCmd::ShowError(
-            "Metronome thread unexpectedly panicked".to_string(),
-        ))
-        .expect("Failed to request error to be displayed on UI");
+impl Metronome {
+    pub fn main(state: Arc<Metronome>, cmd_tx: mpsc::Sender<MainAppCmd>) {
+        thread::spawn(|| main(state)).join().unwrap_err();
+        error!("Metronome panicked");
+        cmd_tx
+            .send(MainAppCmd::ShowError(
+                "Metronome thread unexpectedly panicked".to_string(),
+            ))
+            .expect("Failed to request error to be displayed on UI");
+    }
 }
 
-fn actual_main(state: Arc<Metronome>) -> ! {
+fn main(state: Arc<Metronome>) -> ! {
     info!("Metronome started");
     let (mut interval, mut sleep_time) = bpm_to_tickable(*state.bpm.read());
     let mut remaining = interval;

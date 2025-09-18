@@ -6,7 +6,7 @@ use std::fmt;
 pub enum WidgetId {
     MainAppTopToolBar,
     MainAppButtonStatusBar,
-    WarningModal,
+    ErrorModal,
 }
 
 impl From<WidgetId> for egui::Id {

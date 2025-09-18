@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    app::{
+    apps::{
         composer::Composer,
         helpers::{AppPage, PageId, WidgetId},
         main::{error_modal::ErrorModal, performance::Performance},
@@ -13,8 +13,8 @@ use crate::{
         programmer::Programmer,
         tester::Tester,
     },
-    metronome::{self, Metronome},
-    sheet_reader::{self, SheetReader},
+    routines::metronome::Metronome,
+    routines::sheet_reader::SheetReader,
 };
 
 mod error_modal;
@@ -43,13 +43,13 @@ impl MainApp {
         thread::spawn({
             let state = metronome.clone();
             let cmd_tx = cmd_tx.clone();
-            move || metronome::main(state, cmd_tx)
+            move || Metronome::main(state, cmd_tx)
         });
         thread::spawn({
             let state = sheet_reader.clone();
             let metro = metronome.clone();
             let cmd_tx = cmd_tx.clone();
-            move || sheet_reader::main(state, metro, cmd_tx)
+            move || SheetReader::main(state, metro, cmd_tx)
         });
 
         Self {

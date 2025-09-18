@@ -9,8 +9,8 @@ use log::{debug, error, info};
 use parking_lot::RwLock;
 
 use crate::{
-    app::main::MainAppCmd,
-    metronome::Metronome,
+    apps::main::MainAppCmd,
+    routines::metronome::Metronome,
     sheet::{SheetPattern, SheetTrack},
 };
 
@@ -31,19 +31,21 @@ impl SheetReader {
     }
 }
 
-pub fn main(state: Arc<SheetReader>, metro: Arc<Metronome>, cmd_tx: mpsc::Sender<MainAppCmd>) {
-    thread::spawn(|| actual_main(state, metro))
-        .join()
-        .unwrap_err();
-    error!("Sheet-reader panicked");
-    cmd_tx
-        .send(MainAppCmd::ShowError(
-            "Sheet-reader thread unexpectedly panicked".to_string(),
-        ))
-        .expect("Failed to request error to be displayed on UI");
+// LYN: Main
+
+impl SheetReader {
+    pub fn main(state: Arc<SheetReader>, metro: Arc<Metronome>, cmd_tx: mpsc::Sender<MainAppCmd>) {
+        thread::spawn(|| main(state, metro)).join().unwrap_err();
+        error!("Sheet-reader panicked");
+        cmd_tx
+            .send(MainAppCmd::ShowError(
+                "Sheet-reader thread unexpectedly panicked".to_string(),
+            ))
+            .expect("Failed to request error to be displayed on UI");
+    }
 }
 
-fn actual_main(state: Arc<SheetReader>, metro: Arc<Metronome>) {
+fn main(state: Arc<SheetReader>, metro: Arc<Metronome>) {
     info!("Sheet-reader started");
     let mut curr_tick = { *metro.curr_tick.read() };
 

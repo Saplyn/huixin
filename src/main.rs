@@ -1,11 +1,10 @@
 use simplelog::TermLogger;
 
-use crate::app::main::MainApp;
+use crate::apps::main::MainApp;
 
-mod app;
-mod metronome;
+mod apps;
+mod routines;
 mod sheet;
-mod sheet_reader;
 
 fn main() -> eframe::Result {
     init_logger().expect("Fail to start logger");

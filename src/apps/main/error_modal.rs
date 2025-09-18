@@ -1,4 +1,4 @@
-use crate::app::helpers::WidgetId;
+use crate::apps::helpers::WidgetId;
 
 #[derive(Debug, Default)]
 pub struct ErrorModal {
@@ -16,7 +16,7 @@ impl ErrorModal {
 
     pub fn try_draw(&mut self, ctx: &egui::Context) {
         if let Some(msg) = &self.msg {
-            egui::Modal::new(WidgetId::WarningModal.into()).show(ctx, |ui| {
+            egui::Modal::new(WidgetId::ErrorModal.into()).show(ctx, |ui| {
                 ui.label("CRITICAL APP ERROR");
                 ui.label(msg);
             });
