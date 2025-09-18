@@ -1,17 +1,16 @@
 use simplelog::TermLogger;
 
-use crate::app::App;
+use crate::app::main::MainApp;
 
 mod app;
 mod metronome;
 mod sheet;
 mod sheet_reader;
-mod ui;
 
 fn main() -> eframe::Result {
     init_logger().expect("Fail to start logger");
 
-    let app = App::prepare();
+    let app = MainApp::prepare();
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
         "Unnamed App",

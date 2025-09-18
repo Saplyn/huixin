@@ -9,9 +9,9 @@ use log::{debug, error, info};
 use parking_lot::RwLock;
 
 use crate::{
+    app::main::MainAppCmd,
     metronome::Metronome,
     sheet::{SheetPattern, SheetTrack},
-    ui::main::UICmd,
 };
 
 const TICK_CHECK_INTERVAL: Duration = Duration::from_millis(50);
@@ -31,13 +31,13 @@ impl SheetReader {
     }
 }
 
-pub fn main(state: Arc<SheetReader>, metro: Arc<Metronome>, ui_cmd_tx: mpsc::Sender<UICmd>) {
+pub fn main(state: Arc<SheetReader>, metro: Arc<Metronome>, cmd_tx: mpsc::Sender<MainAppCmd>) {
     thread::spawn(|| actual_main(state, metro))
         .join()
         .unwrap_err();
     error!("Sheet-reader panicked");
-    ui_cmd_tx
-        .send(UICmd::ShowError(
+    cmd_tx
+        .send(MainAppCmd::ShowError(
             "Sheet-reader thread unexpectedly panicked".to_string(),
         ))
         .expect("Failed to request error to be displayed on UI");

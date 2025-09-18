@@ -1,4 +1,4 @@
-use crate::ui::helpers::WidgetId;
+use crate::app::helpers::WidgetId;
 
 #[derive(Debug, Default)]
 pub struct ErrorModal {

@@ -1,4 +1,4 @@
-use crate::ui::helpers::{AppPage, PageId};
+use crate::app::helpers::{AppPage, PageId};
 
 #[derive(Debug, Default)]
 pub struct Networker {}

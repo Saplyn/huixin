@@ -26,7 +26,7 @@ impl Performance {
         self.frame_times.add(now, previous_frame_time); // projected
     }
 
-    pub fn draw(&mut self, ui: &mut egui::Ui) {
+    pub fn ui(&mut self, ui: &mut egui::Ui) {
         ui.label(format!(
             "Mean CPU usage: {:.2} ms / frame",
             1e3 * self.frame_times.average().unwrap_or_default()
