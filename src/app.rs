@@ -5,6 +5,7 @@ use std::{
 
 use crate::{
     metronome::{self, Metronome},
+    sheet_reader::{self, SheetReader},
     ui::{
         composer::Composer, main::UI, networker::Networker, programmer::Programmer, tester::Tester,
     },
@@ -16,27 +17,39 @@ pub struct App {
     pub metronome: Arc<Metronome>,
 }
 
-pub fn prepare_app() -> App {
-    let (ui_cmd_tx, ui_cmd_rx) = mpsc::channel();
-    let app = App {
-        ui: UI {
-            pages: vec![
-                Box::new(Tester),
-                Box::new(Composer),
-                Box::new(Programmer),
-                Box::new(Networker),
-            ],
-            cmd_tx: ui_cmd_tx.clone(),
-            cmd_rx: ui_cmd_rx,
-            active_page: Default::default(),
-            performance: Default::default(),
-            error_modal: Default::default(),
-        },
-        metronome: Arc::new(Metronome::new()),
-    };
+impl App {
+    pub fn prepare() -> App {
+        let (ui_cmd_tx, ui_cmd_rx) = mpsc::channel();
+        let metronome = Arc::new(Metronome::new());
+        let sheet_reader = Arc::new(SheetReader::new());
 
-    let metronome = app.metronome.clone();
-    thread::spawn(move || metronome::main(metronome, ui_cmd_tx));
+        thread::spawn({
+            let state = metronome.clone();
+            let ui_cmd_tx = ui_cmd_tx.clone();
+            move || metronome::main(state, ui_cmd_tx)
+        });
+        thread::spawn({
+            let state = sheet_reader.clone();
+            let metro = metronome.clone();
+            let ui_cmd_tx = ui_cmd_tx.clone();
+            move || sheet_reader::main(state, metro, ui_cmd_tx)
+        });
 
-    app
+        Self {
+            ui: UI {
+                pages: vec![
+                    Box::new(Tester {}),
+                    Box::new(Composer { sheet_reader }),
+                    Box::new(Programmer {}),
+                    Box::new(Networker {}),
+                ],
+                cmd_tx: ui_cmd_tx,
+                cmd_rx: ui_cmd_rx,
+                active_page: Default::default(),
+                performance: Default::default(),
+                error_modal: Default::default(),
+            },
+            metronome,
+        }
+    }
 }

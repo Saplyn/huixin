@@ -1,7 +1,7 @@
 use crate::ui::helpers::{AppPage, PageId};
 
 #[derive(Debug, Default)]
-pub struct Tester;
+pub struct Tester {}
 
 impl AppPage for Tester {
     fn page_id(&self) -> PageId {

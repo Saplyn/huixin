@@ -5,14 +5,14 @@ use std::{
     time::Duration,
 };
 
-use log::{debug, error};
+use log::{debug, error, info};
 use parking_lot::RwLock;
 
 use crate::ui::main::UICmd;
 
 const TICK_PER_BEAT: u32 = 4;
 const SLEEP_PER_INTERVAL: u32 = 100;
-const MAX_SLEEP_DURATION: Duration = Duration::from_millis(100);
+const MAX_INTERVAL: Duration = Duration::from_millis(50);
 
 #[derive(Debug)]
 pub struct Metronome {
@@ -37,7 +37,7 @@ fn bpm_to_tickable(bpm: f64) -> (Duration, Duration) {
     let interval = Duration::from_secs_f64(60. / (bpm * TICK_PER_BEAT as f64));
     (
         interval,
-        cmp::min(MAX_SLEEP_DURATION, interval / SLEEP_PER_INTERVAL),
+        cmp::min(MAX_INTERVAL, interval / SLEEP_PER_INTERVAL),
     )
 }
 
@@ -52,6 +52,7 @@ pub fn main(state: Arc<Metronome>, ui_cmd_tx: mpsc::Sender<UICmd>) {
 }
 
 fn actual_main(state: Arc<Metronome>) -> ! {
+    info!("Metronome started");
     let (mut interval, mut sleep_time) = bpm_to_tickable(*state.bpm.read());
     let mut remaining = interval;
     let mut active_bpm = *state.bpm.read();

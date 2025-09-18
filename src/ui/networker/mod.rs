@@ -1,7 +1,7 @@
 use crate::ui::helpers::{AppPage, PageId};
 
 #[derive(Debug, Default)]
-pub struct Networker;
+pub struct Networker {}
 
 impl AppPage for Networker {
     fn page_id(&self) -> PageId {

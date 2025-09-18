@@ -1,7 +1,14 @@
-use crate::ui::helpers::{AppPage, PageId};
+use std::sync::Arc;
 
-#[derive(Debug, Default)]
-pub struct Composer;
+use crate::{
+    sheet_reader::SheetReader,
+    ui::helpers::{AppPage, PageId},
+};
+
+#[derive(Debug)]
+pub struct Composer {
+    pub sheet_reader: Arc<SheetReader>,
+}
 
 impl AppPage for Composer {
     fn page_id(&self) -> PageId {
@@ -12,7 +19,7 @@ impl AppPage for Composer {
 impl eframe::App for Composer {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.label(self.page_id().to_string());
+            ui.label(format!("{:#?}", self.sheet_reader));
         });
     }
 }
