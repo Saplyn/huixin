@@ -1,5 +1,5 @@
 [package]
-name = "unnamed"
+name = "qingbo"
 version = "0.0.0"
 edition = "2024"
 build = "build.rs"

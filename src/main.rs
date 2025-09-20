@@ -11,11 +11,7 @@ fn main() -> eframe::Result {
 
     let app = MainApp::prepare();
     let native_options = eframe::NativeOptions::default();
-    eframe::run_native(
-        "Unnamed App",
-        native_options,
-        Box::new(|cc| Ok(Box::new(app))),
-    )
+    eframe::run_native("Qing Bo", native_options, Box::new(|cc| Ok(Box::new(app))))
 }
 
 fn init_logger() -> Result<(), log::SetLoggerError> {
