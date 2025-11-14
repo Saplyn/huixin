@@ -1,5 +1,5 @@
 [package]
-name = "qingbo"
+name = "huixin"
 version = "0.0.0"
 edition = "2024"
 build = "build.rs"
@@ -9,8 +9,8 @@ chrono = "0.4"
 
 [dependencies]
 # EGUI
-eframe = "0.32"
-egui = { version = "0.32", features = ["log"] }
+eframe = "0.33"
+egui = "0.33"
 # Concurrency
 parking_lot = "0.12"
 dashmap = "7.0.0-rc2"

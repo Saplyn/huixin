@@ -4,6 +4,8 @@ use std::{
     thread,
 };
 
+use parking_lot::RwLock;
+
 use crate::{
     apps::{
         composer::Composer,
@@ -13,8 +15,14 @@ use crate::{
         programmer::Programmer,
         tester::Tester,
     },
-    routines::metronome::Metronome,
-    routines::sheet_reader::SheetReader,
+    routines::{
+        metronome::{self, Metronome},
+        sheet_reader::{SheetContext, SheetReader},
+    },
+    sheet::{
+        Timed,
+        pattern::{PianoNote, PianoPattern, SheetPattern, SheetPatternInner},
+    },
 };
 
 mod error_modal;
@@ -32,13 +40,43 @@ pub struct MainApp {
     pub error_modal: ErrorModal,
 
     pub metronome: Arc<Metronome>,
+    pub sheet_reader: Arc<SheetReader>,
 }
 
 impl MainApp {
-    pub fn prepare() -> MainApp {
+    pub fn prepare() -> Self {
         let (cmd_tx, cmd_rx) = mpsc::channel();
         let metronome = Arc::new(Metronome::new());
         let sheet_reader = Arc::new(SheetReader::new());
+
+        // TODO: placeholder
+        {
+            let pattern = Arc::new(SheetPattern {
+                name: "Test".to_string(),
+                inner: SheetPatternInner::Piano(PianoPattern {
+                    notes: vec![
+                        Timed::new(
+                            0,
+                            PianoNote {
+                                strength: u16::MAX,
+                                code: 60,
+                                length: metronome::TICK_PER_BEAT as u64,
+                            },
+                        ),
+                        Timed::new(
+                            (metronome::TICK_PER_BEAT * 2) as u64,
+                            PianoNote {
+                                strength: u16::MAX,
+                                code: 61,
+                                length: metronome::TICK_PER_BEAT as u64,
+                            },
+                        ),
+                    ],
+                }),
+            });
+            sheet_reader.patterns.write().push(pattern.clone());
+            *sheet_reader.context.write() = SheetContext::Pattern(Arc::downgrade(&pattern));
+        }
 
         thread::spawn({
             let state = metronome.clone();
@@ -55,7 +93,9 @@ impl MainApp {
         Self {
             pages: vec![
                 Box::new(Tester {}),
-                Box::new(Composer { sheet_reader }),
+                Box::new(Composer {
+                    sheet_reader: sheet_reader.clone(),
+                }),
                 Box::new(Programmer {}),
                 Box::new(Networker {}),
             ],
@@ -65,6 +105,7 @@ impl MainApp {
             performance: Default::default(),
             error_modal: Default::default(),
             metronome,
+            sheet_reader,
         }
     }
 }
@@ -142,6 +183,13 @@ impl MainApp {
 
     // TODO:
     fn media_control(&mut self, ui: &mut egui::Ui) {
+        ui.label(match *self.sheet_reader.context.read() {
+            SheetContext::Track => "Track".to_string(),
+            SheetContext::Pattern(ref pat) => pat
+                .upgrade()
+                .map(|pat| pat.name.clone())
+                .unwrap_or("ERROR".to_string()),
+        });
         ui.checkbox(self.metronome.playing.write().deref_mut(), "Playing");
         ui.add(egui::DragValue::new(self.metronome.bpm.write().deref_mut()).range(1..=640));
     }

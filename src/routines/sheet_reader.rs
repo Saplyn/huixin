@@ -1,34 +1,42 @@
 use std::{
-    sync::{Arc, mpsc},
+    sync::{Arc, Weak, mpsc},
     thread,
     time::Duration,
 };
 
-use dashmap::DashMap;
 use log::{debug, error, info};
 use parking_lot::RwLock;
 
 use crate::{
     apps::main::MainAppCmd,
     routines::metronome::Metronome,
-    sheet::{SheetPattern, SheetTrack},
+    sheet::{SheetTrack, pattern::SheetPattern},
 };
 
 const TICK_CHECK_INTERVAL: Duration = Duration::from_millis(50);
 
 #[derive(Debug)]
 pub struct SheetReader {
-    patterns: DashMap<String, SheetPattern>,
-    tracks: RwLock<Vec<SheetTrack>>,
+    pub context: RwLock<SheetContext>,
+    pub patterns: RwLock<Vec<Arc<SheetPattern>>>,
+    pub tracks: RwLock<Vec<SheetTrack>>,
 }
 
 impl SheetReader {
     pub fn new() -> Self {
         Self {
-            patterns: DashMap::new(),
+            context: Default::default(),
+            patterns: Default::default(),
             tracks: RwLock::new(Vec::new()),
         }
     }
+}
+
+#[derive(Debug, Default)]
+pub enum SheetContext {
+    #[default]
+    Track,
+    Pattern(Weak<SheetPattern>),
 }
 
 // LYN: Main
