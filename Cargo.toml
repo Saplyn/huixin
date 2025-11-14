@@ -1,11 +1,19 @@
 [workspace]
 resolver = "3"
-members = ["huixin"]
+members = ["crates/huixin", "crates/huisheng", "crates/util"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+authors = ["Saplyn"]
 
 [workspace.dependencies]
 # EGUI
-eframe = "0.33"
-egui = "0.33"
+eframe = { version = "0.33", default-features = false }
+egui = { version = "0.33", default-features = false }
+epaint = { version = "0.33", default-features = false }
 # Logging
 log = "0.4"
 simplelog = "0.12"
+# Misc
+lyn-util = { path = "crates/util" }

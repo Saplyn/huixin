@@ -1397,6 +1397,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
 
 [[package]]
+name = "huisheng"
+version = "0.0.0"
+
+[[package]]
 name = "huixin"
 version = "0.0.0"
 dependencies = [
@@ -1405,6 +1409,7 @@ dependencies = [
  "eframe",
  "egui",
  "log",
+ "lyn-util",
  "parking_lot",
  "simplelog",
 ]
@@ -1695,6 +1700,14 @@ name = "log"
 version = "0.4.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34080505efa8e45a4b816c349525ebe327ceaa8559756f0356cba97ef3bf7432"
+
+[[package]]
+name = "lyn-util"
+version = "0.0.0"
+dependencies = [
+ "egui",
+ "epaint",
+]
 
 [[package]]
 name = "malloc_buf"
@@ -2774,7 +2787,7 @@ dependencies = [
  "getrandom",
  "once_cell",
  "rustix 1.1.2",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

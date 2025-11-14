@@ -1,0 +1,10 @@
+[package]
+name = "lyn-util"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+
+[dependencies]
+# EGUI
+egui = { workspace = true }
+epaint = { workspace = true }
