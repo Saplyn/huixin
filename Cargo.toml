@@ -1,19 +1,11 @@
-[package]
-name = "huixin"
-version = "0.0.0"
-edition = "2024"
-build = "build.rs"
+[workspace]
+resolver = "3"
+members = ["huixin"]
 
-[build-dependencies]
-chrono = "0.4"
-
-[dependencies]
+[workspace.dependencies]
 # EGUI
 eframe = "0.33"
 egui = "0.33"
-# Concurrency
-parking_lot = "0.12"
-dashmap = "7.0.0-rc2"
 # Logging
 log = "0.4"
 simplelog = "0.12"
