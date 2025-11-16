@@ -1,5 +1,5 @@
 use std::{
-    sync::{Arc, Weak, mpsc},
+    sync::{mpsc, Arc, Weak},
     thread,
     time::Duration,
 };
@@ -8,9 +8,9 @@ use log::{debug, error, info};
 use parking_lot::RwLock;
 
 use crate::{
-    apps::main::MainAppCmd,
+    app_ui::MainAppCmd,
     routines::metronome::Metronome,
-    sheet::{SheetTrack, pattern::SheetPattern},
+    sheet::{pattern::SheetPattern, SheetTrack},
 };
 
 const TICK_CHECK_INTERVAL: Duration = Duration::from_millis(50);

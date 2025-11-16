@@ -4,41 +4,33 @@ use std::{
     thread,
 };
 
-use parking_lot::RwLock;
-
 use crate::{
-    apps::{
-        composer::Composer,
-        helpers::{AppPage, PageId, WidgetId},
-        main::{error_modal::ErrorModal, performance::Performance},
-        networker::Networker,
-        programmer::Programmer,
-        tester::Tester,
+    app_ui::{
+        helpers::WidgetId,
+        widgets::{error_modal::ErrorModal, performance::Performance},
     },
     routines::{
-        metronome::{self, Metronome},
+        metronome::Metronome,
         sheet_reader::{SheetContext, SheetReader},
-    },
-    sheet::{
-        Timed,
-        pattern::{PianoNote, PianoPattern, SheetPattern, SheetPatternInner},
     },
 };
 
-mod error_modal;
-mod performance;
+mod helpers;
+mod widgets;
 
 // LYN: Main App State Holder
 
 #[derive(Debug)]
 pub struct MainApp {
+    // command handling
     pub cmd_tx: mpsc::Sender<MainAppCmd>,
     pub cmd_rx: mpsc::Receiver<MainAppCmd>,
-    pub active_page: PageId,
-    pub pages: Vec<Box<dyn AppPage>>,
+
+    // widget states
     pub performance: Performance,
     pub error_modal: ErrorModal,
 
+    // routine states
     pub metronome: Arc<Metronome>,
     pub sheet_reader: Arc<SheetReader>,
 }
@@ -48,35 +40,6 @@ impl MainApp {
         let (cmd_tx, cmd_rx) = mpsc::channel();
         let metronome = Arc::new(Metronome::new());
         let sheet_reader = Arc::new(SheetReader::new());
-
-        // TODO: placeholder
-        {
-            let pattern = Arc::new(SheetPattern {
-                name: "Test".to_string(),
-                inner: SheetPatternInner::Piano(PianoPattern {
-                    notes: vec![
-                        Timed::new(
-                            0,
-                            PianoNote {
-                                strength: u16::MAX,
-                                code: 60,
-                                length: metronome::TICK_PER_BEAT as u64,
-                            },
-                        ),
-                        Timed::new(
-                            (metronome::TICK_PER_BEAT * 2) as u64,
-                            PianoNote {
-                                strength: u16::MAX,
-                                code: 61,
-                                length: metronome::TICK_PER_BEAT as u64,
-                            },
-                        ),
-                    ],
-                }),
-            });
-            sheet_reader.patterns.write().push(pattern.clone());
-            *sheet_reader.context.write() = SheetContext::Pattern(Arc::downgrade(&pattern));
-        }
 
         thread::spawn({
             let state = metronome.clone();
@@ -91,17 +54,8 @@ impl MainApp {
         });
 
         Self {
-            pages: vec![
-                Box::new(Tester {}),
-                Box::new(Composer {
-                    sheet_reader: sheet_reader.clone(),
-                }),
-                Box::new(Programmer {}),
-                Box::new(Networker {}),
-            ],
             cmd_tx,
             cmd_rx,
-            active_page: Default::default(),
             performance: Default::default(),
             error_modal: Default::default(),
             metronome,
@@ -144,7 +98,7 @@ impl eframe::App for MainApp {
         self.handle_ui_cmd();
 
         self.draw_ui(ctx);
-        self.draw_active_app(ctx, frame);
+        self.draw_active_tool_windows(ctx);
         self.error_modal.try_draw(ctx);
     }
 }
@@ -155,11 +109,11 @@ impl MainApp {
             ui.horizontal(|ui| {
                 self.app_menu(ui);
                 ui.separator();
-                self.media_control(ui);
+                self.context_control(ui);
                 ui.separator();
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    self.navigation(ui);
+                    self.toolbar(ui);
                     ui.separator();
                 });
             })
@@ -174,6 +128,24 @@ impl MainApp {
                 });
             });
         });
+
+        egui::SidePanel::left(WidgetId::MainAppLeftExplorerPanel)
+            .show(ctx, |ui| ui.label("explorer"));
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.label("Tracks");
+        });
+    }
+
+    fn draw_active_tool_windows(&mut self, ctx: &egui::Context) {
+        egui::Window::new("Saplyn 苗傲")
+            .id(egui::Id::new("Saplyn"))
+            .title_bar(false)
+            .show(ctx, |ui| {
+                egui::TopBottomPanel::top("top").show_inside(ui, |ui| ui.label("top"));
+                ui.label("Meow 喵喵");
+                ui.allocate_space(ui.available_size());
+            });
     }
 
     // TODO:
@@ -182,7 +154,7 @@ impl MainApp {
     }
 
     // TODO:
-    fn media_control(&mut self, ui: &mut egui::Ui) {
+    fn context_control(&mut self, ui: &mut egui::Ui) {
         ui.label(match *self.sheet_reader.context.read() {
             SheetContext::Track => "Track".to_string(),
             SheetContext::Pattern(ref pat) => pat
@@ -194,23 +166,7 @@ impl MainApp {
         ui.add(egui::DragValue::new(self.metronome.bpm.write().deref_mut()).range(1..=640));
     }
 
-    fn navigation(&mut self, ui: &mut egui::Ui) {
-        let active_page = self.active_page;
-        self.pages.iter_mut().rev().for_each(|page| {
-            if ui
-                .selectable_label(page.page_id() == active_page, page.page_id().to_string())
-                .clicked()
-            {
-                self.active_page = page.page_id();
-            }
-        });
-    }
-
-    fn draw_active_app(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        for page in self.pages.iter_mut() {
-            if page.page_id() == self.active_page || ctx.memory(|mem| mem.everything_is_visible()) {
-                page.update(ctx, frame);
-            }
-        }
+    fn toolbar(&mut self, ui: &mut egui::Ui) {
+        ui.label("Toolbar");
     }
 }

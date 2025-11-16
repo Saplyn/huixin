@@ -1,9 +1,9 @@
 use lyn_util::EguiContextExt;
 use simplelog::TermLogger;
 
-use crate::apps::main::MainApp;
+use crate::app_ui::MainApp;
 
-mod apps;
+mod app_ui;
 mod routines;
 mod sheet;
 
