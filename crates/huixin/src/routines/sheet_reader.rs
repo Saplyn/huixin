@@ -9,11 +9,11 @@ use parking_lot::RwLock;
 
 use crate::{
     app::MainAppCmd,
-    routines::metronome::Metronome,
+    routines::{RoutineId, metronome::Metronome},
     sheet::{SheetTrack, pattern::SheetPattern},
 };
 
-const TICK_CHECK_INTERVAL: Duration = Duration::from_millis(50);
+const REQUEST_TICK_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 #[derive(Debug)]
 pub struct SheetReader {
@@ -55,14 +55,12 @@ impl SheetReader {
 
 fn main(state: Arc<SheetReader>, metro: Arc<Metronome>) {
     info!("Sheet-reader started");
-    let mut curr_tick = { *metro.curr_tick.read() };
 
     loop {
         // wait for tick change
-        while curr_tick == *metro.curr_tick.read() {
-            thread::sleep(TICK_CHECK_INTERVAL);
+        if let Some(tick) = metro.request_tick(RoutineId::SheetReader) {
+            debug!("{tick}");
         }
-        debug!("{curr_tick} -> {}", metro.curr_tick.read());
-        curr_tick = *metro.curr_tick.read();
+        thread::sleep(REQUEST_TICK_POLL_INTERVAL);
     }
 }

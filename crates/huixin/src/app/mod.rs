@@ -152,13 +152,13 @@ impl MainApp {
         }
     }
 
-    // TODO:
+    // TODO: design & impl the actual menus
     fn app_menu(&mut self, ui: &mut egui::Ui) {
         ui.label("menubar");
     }
 
-    // TODO:
     fn context_control(&mut self, ui: &mut egui::Ui) {
+        // TODO: impl actual context swicher
         ui.label(match *self.sheet_reader.context.read() {
             SheetContext::Track => "Track".to_string(),
             SheetContext::Pattern(ref pat) => pat
@@ -167,34 +167,37 @@ impl MainApp {
                 .unwrap_or("ERROR".to_string()),
         });
 
+        let playing = self.metronome.playing();
+        if ui
+            .add(
+                egui::Button::new(if playing { " " } else { " " })
+                    .selected(playing)
+                    .frame_when_inactive(true),
+            )
+            .clicked()
         {
-            let mut metro_playing = self.metronome.playing.write();
-            if ui
-                .add(
-                    egui::Button::new(if *metro_playing { " " } else { " " })
-                        .selected(*metro_playing)
-                        .frame_when_inactive(true),
-                )
-                .clicked()
-            {
-                *metro_playing = !*metro_playing;
-            }
-
-            let mut metro_tick = self.metronome.curr_tick.write();
-            if ui
-                .add_enabled(*metro_tick != 0, egui::Button::new(""))
-                .clicked()
-            {
-                *metro_playing = false;
-                *metro_tick = 0;
-            };
+            self.metronome.toggle_playing(None);
         }
+
+        if ui
+            .add_enabled(!self.metronome.stopped(), egui::Button::new(""))
+            .clicked()
+        {
+            self.metronome.stop();
+        };
 
         ui.add(
             egui::DragValue::new(self.metronome.bpm.write().deref_mut())
                 .range(1..=640)
                 .prefix("BPM "),
         );
+
+        // TODO: impl actual context progress bar
+        ui.label(format!(
+            " {}/{:?}",
+            self.metronome.query_tick(),
+            *self.metronome.top_tick.read()
+        ));
     }
 
     fn toolbar(&mut self, ui: &mut egui::Ui) {
