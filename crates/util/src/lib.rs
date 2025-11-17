@@ -26,10 +26,16 @@ impl EguiContextExt for egui::Context {
             FontData::from_static(include_bytes!(
                 "../fonts/maplemono-nf-cn/MapleMono-NF-CN-Regular.ttf"
             )),
-            vec![InsertFontFamily {
-                family: FontFamily::Monospace,
-                priority: FontPriority::Lowest,
-            }],
+            vec![
+                InsertFontFamily {
+                    family: FontFamily::Proportional,
+                    priority: FontPriority::Lowest,
+                },
+                InsertFontFamily {
+                    family: FontFamily::Monospace,
+                    priority: FontPriority::Lowest,
+                },
+            ],
         ));
     }
 }

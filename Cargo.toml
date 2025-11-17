@@ -12,6 +12,8 @@ authors = ["Saplyn"]
 eframe = { version = "0.33", default-features = false }
 egui = { version = "0.33", default-features = false }
 epaint = { version = "0.33", default-features = false }
+emath = { version = "0.33", default-features = false }
+egui_extras = { version = "0.33", default-features = false }
 # Logging
 log = "0.4"
 simplelog = "0.12"

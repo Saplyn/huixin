@@ -5,8 +5,9 @@ use std::{
 };
 
 use crate::{
-    app_ui::{
+    app::{
         helpers::WidgetId,
+        tools::{ToolWindow, tester::Tester},
         widgets::{error_modal::ErrorModal, performance::Performance},
     },
     routines::{
@@ -16,6 +17,7 @@ use crate::{
 };
 
 mod helpers;
+mod tools;
 mod widgets;
 
 // LYN: Main App State Holder
@@ -29,6 +31,7 @@ pub struct MainApp {
     // widget states
     pub performance: Performance,
     pub error_modal: ErrorModal,
+    pub tools: Vec<Box<dyn ToolWindow>>,
 
     // routine states
     pub metronome: Arc<Metronome>,
@@ -40,6 +43,8 @@ impl MainApp {
         let (cmd_tx, cmd_rx) = mpsc::channel();
         let metronome = Arc::new(Metronome::new());
         let sheet_reader = Arc::new(SheetReader::new());
+
+        let tools: Vec<Box<dyn ToolWindow>> = vec![Box::new(Tester::default())];
 
         thread::spawn({
             let state = metronome.clone();
@@ -58,13 +63,14 @@ impl MainApp {
             cmd_rx,
             performance: Default::default(),
             error_modal: Default::default(),
+            tools,
             metronome,
             sheet_reader,
         }
     }
 }
 
-// LYN: Main App Command
+// LYN: Main App Command Handling
 
 pub enum MainAppCmd {
     ShowError(String),
@@ -88,7 +94,7 @@ impl MainApp {
     }
 }
 
-// LYN: UI Implementation
+// LYN: Main App UI Implementation
 
 impl eframe::App for MainApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
@@ -100,6 +106,7 @@ impl eframe::App for MainApp {
         self.draw_ui(ctx);
         self.draw_active_tool_windows(ctx);
         self.error_modal.try_draw(ctx);
+        ctx.request_repaint();
     }
 }
 
@@ -138,14 +145,11 @@ impl MainApp {
     }
 
     fn draw_active_tool_windows(&mut self, ctx: &egui::Context) {
-        egui::Window::new("Saplyn 苗傲")
-            .id(egui::Id::new("Saplyn"))
-            .title_bar(false)
-            .show(ctx, |ui| {
-                egui::TopBottomPanel::top("top").show_inside(ui, |ui| ui.label("top"));
-                ui.label("Meow 喵喵");
-                ui.allocate_space(ui.available_size());
-            });
+        for tool in self.tools.iter_mut() {
+            if tool.window_open() {
+                tool.draw(ctx);
+            }
+        }
     }
 
     // TODO:
@@ -162,11 +166,49 @@ impl MainApp {
                 .map(|pat| pat.name.clone())
                 .unwrap_or("ERROR".to_string()),
         });
-        ui.checkbox(self.metronome.playing.write().deref_mut(), "Playing");
-        ui.add(egui::DragValue::new(self.metronome.bpm.write().deref_mut()).range(1..=640));
+
+        {
+            let mut metro_playing = self.metronome.playing.write();
+            if ui
+                .add(
+                    egui::Button::new(if *metro_playing { " " } else { " " })
+                        .selected(*metro_playing)
+                        .frame_when_inactive(true),
+                )
+                .clicked()
+            {
+                *metro_playing = !*metro_playing;
+            }
+
+            let mut metro_tick = self.metronome.curr_tick.write();
+            if ui
+                .add_enabled(*metro_tick != 0, egui::Button::new(""))
+                .clicked()
+            {
+                *metro_playing = false;
+                *metro_tick = 0;
+            };
+        }
+
+        ui.add(
+            egui::DragValue::new(self.metronome.bpm.write().deref_mut())
+                .range(1..=640)
+                .prefix("BPM "),
+        );
     }
 
     fn toolbar(&mut self, ui: &mut egui::Ui) {
-        ui.label("Toolbar");
+        for tool in self.tools.iter_mut() {
+            if ui
+                .add(
+                    egui::Button::new(tool.icon())
+                        .selected(tool.window_open())
+                        .frame_when_inactive(true),
+                )
+                .clicked()
+            {
+                tool.toggle_open(None);
+            }
+        }
     }
 }

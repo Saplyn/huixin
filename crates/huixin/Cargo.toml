@@ -11,7 +11,8 @@ chrono = "0.4"
 [dependencies]
 # EGUI
 eframe = { workspace = true, features = ["default"] }
-egui = { workspace = true, features = ["default"] }
+egui = { workspace = true }
+emath = { workspace = true }
 # Logging
 log = { workspace = true }
 simplelog = { workspace = true }

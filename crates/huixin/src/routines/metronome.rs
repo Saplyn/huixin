@@ -8,7 +8,7 @@ use std::{
 use log::{debug, error, info};
 use parking_lot::RwLock;
 
-use crate::app_ui::MainAppCmd;
+use crate::app::MainAppCmd;
 
 pub const TICK_PER_BEAT: u32 = 4;
 pub const SLEEP_PER_TICK: u32 = 50;
