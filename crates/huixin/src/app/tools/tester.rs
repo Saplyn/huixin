@@ -1,19 +1,39 @@
-use crate::app::tools::ToolWindow;
+use std::sync::Arc;
+
+use crate::{
+    app::{MainState, helpers::WidgetId, tools::ToolWindow},
+    routines::{
+        metronome::Metronome,
+        sheet_reader::{SheetContext, SheetReader},
+    },
+};
 
 #[derive(Debug)]
 pub struct Tester {
     open: bool,
+    main_state: Arc<MainState>,
+    metronome: Arc<Metronome>,
+    sheet_reader: Arc<SheetReader>,
 }
 
-impl Default for Tester {
-    fn default() -> Self {
-        Self { open: true }
+impl Tester {
+    pub fn new(
+        main_state: Arc<MainState>,
+        metronome: Arc<Metronome>,
+        sheet_reader: Arc<SheetReader>,
+    ) -> Self {
+        Self {
+            open: false,
+            main_state,
+            metronome,
+            sheet_reader,
+        }
     }
 }
 
 impl ToolWindow for Tester {
     fn icon(&self) -> String {
-        "󰄛 ".to_string()
+        "󰙨 ".to_string()
     }
 
     fn window_open(&self) -> bool {
@@ -33,26 +53,79 @@ impl ToolWindow for Tester {
     }
 
     fn draw(&mut self, ctx: &egui::Context) {
-        egui::Window::new("Test Tool Window 测试工具窗口")
-            .id(egui::Id::new("test-tool-window"))
+        egui::Window::new("Tester")
+            .id(WidgetId::ToolWindowTest.into())
             .frame(egui::Frame::window(&ctx.style()).inner_margin(0))
             .title_bar(false)
-            .min_size(emath::vec2(300., 150.))
+            .min_size(emath::vec2(400., 150.))
             .show(ctx, |ui| {
-                egui::TopBottomPanel::top("tester-top").show_inside(ui, |ui| {
-                    ui.label("top");
-                });
-
-                egui::SidePanel::right("tester-right")
+                egui::TopBottomPanel::top(WidgetId::ToolWindowTestTopUtilBar).show_inside(
+                    ui,
+                    |ui| {
+                        self.top_util_bar(ui);
+                    },
+                );
+                egui::SidePanel::right(WidgetId::ToolWindowTestRightDetailPanel)
                     .resizable(false)
                     .show_inside(ui, |ui| {
-                        ui.label("right");
+                        self.right_detail_panel(ui);
                     });
-
                 egui::CentralPanel::default().show_inside(ui, |ui| {
-                    ui.label("Meow meow 喵喵 󰄛 ");
-                    ui.code("Meow meow 喵喵 󰄛 ");
+                    self.central_panel(ui);
                 });
             });
+    }
+}
+
+impl Tester {
+    fn top_util_bar(&mut self, ui: &mut egui::Ui) {
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if ui
+                .add(
+                    egui::Button::new(" ")
+                        .frame(false)
+                        .frame_when_inactive(false),
+                )
+                .clicked()
+            {
+                self.open = false;
+            }
+            ui.disable();
+            ui.vertical_centered(|ui| {
+                ui.heading("Tester");
+            });
+        });
+    }
+
+    fn right_detail_panel(&mut self, ui: &mut egui::Ui) {
+        ui.label("right");
+    }
+
+    fn central_panel(&mut self, ui: &mut egui::Ui) {
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            ui.code(format!(
+                "*selected_pattern: {:#?}",
+                self.main_state
+                    .selected_pattern
+                    .read()
+                    .as_ref()
+                    .and_then(|ptr| ptr.upgrade())
+            ));
+            ui.code(format!("{:#?}", self.main_state));
+            ui.separator();
+            ui.code(format!(
+                "*context: {}",
+                match self.sheet_reader.context() {
+                    SheetContext::Track => "Track".to_string(),
+                    SheetContext::Pattern(pat_ptr) => pat_ptr
+                        .upgrade()
+                        .map(|pat| pat.name.clone())
+                        .unwrap_or("[Invalid]".to_string()),
+                }
+            ));
+            ui.code(format!("{:#?}", self.sheet_reader));
+            ui.separator();
+            ui.code(format!("{:#?}", self.metronome));
+        });
     }
 }

@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+pub mod pattern_editor;
 pub mod tester;
 
 pub trait ToolWindow: Debug {

@@ -8,17 +8,24 @@ pub struct SheetPattern {
     pub inner: SheetPatternInner,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum SheetPatternType {
+    Midi,
+    // Curve,
+    // Event,
+}
+
 #[derive(Debug)]
 pub enum SheetPatternInner {
-    Piano(PianoPattern),
+    Midi(MidiPattern),
     // Curve(CurvePattern),
     // Event(EventPattern),
 }
 
-// LYN: Pattern - Piano
+// LYN: Pattern - Midi
 
 #[derive(Debug)]
-pub struct PianoPattern {
+pub struct MidiPattern {
     pub notes: Vec<Timed<PianoNote>>,
 }
 
@@ -29,7 +36,7 @@ pub struct PianoNote {
     pub length: u64,
 }
 
-impl PianoPattern {
+impl MidiPattern {
     fn get_action(&self, tick: u16) {}
 }
 

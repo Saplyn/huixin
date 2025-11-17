@@ -7,7 +7,7 @@ use std::{
 
 use dashmap::DashMap;
 use log::{debug, error, info};
-use parking_lot::RwLock;
+use parking_lot::{RwLock, RwLockWriteGuard};
 
 use crate::{app::MainAppCmd, routines::RoutineId};
 
@@ -20,10 +20,10 @@ pub const MAX_SLEEP_TIME: Duration = Duration::from_millis(50);
 #[derive(Debug)]
 pub struct Metronome {
     // core states
-    pub playing: RwLock<bool>,
-    pub bpm: RwLock<f64>,
-    pub curr_tick: RwLock<u64>,
-    pub top_tick: RwLock<Option<u64>>,
+    playing: RwLock<bool>,
+    bpm: RwLock<f64>,
+    curr_tick: RwLock<u64>,
+    top_tick: RwLock<Option<u64>>,
 
     // api states
     tick_memory: DashMap<RoutineId, u64>,
@@ -125,9 +125,24 @@ impl Metronome {
         self.tick_memory.clear();
     }
 
+    /// Returns the top tick, if any.
+    pub fn top_tick(&self) -> Option<u64> {
+        *self.top_tick.read()
+    }
+
+    /// Returns the BPM value.
+    pub fn bpm(&self) -> f64 {
+        *self.bpm.read()
+    }
+
     /// Returns the current tick.
     pub fn query_tick(&self) -> u64 {
         *self.curr_tick.read()
+    }
+
+    /// Returns a writable guard to the BPM value.
+    pub fn bpm_mut(&self) -> RwLockWriteGuard<'_, f64> {
+        self.bpm.write()
     }
 
     /// Requests the current tick for the given routine.

@@ -1,18 +1,25 @@
 use std::{
-    ops::DerefMut,
-    sync::{Arc, mpsc},
+    ops::{Deref, DerefMut},
+    sync::{Arc, Weak, mpsc},
     thread,
 };
+
+use egui::Button;
+use parking_lot::{RwLock, RwLockReadGuard};
 
 use crate::{
     app::{
         helpers::WidgetId,
-        tools::{ToolWindow, tester::Tester},
+        tools::{ToolWindow, pattern_editor::PatternEditor, tester::Tester},
         widgets::{error_modal::ErrorModal, performance::Performance},
     },
     routines::{
         metronome::Metronome,
         sheet_reader::{SheetContext, SheetReader},
+    },
+    sheet::{
+        SheetTrack,
+        pattern::{SheetPattern, SheetPatternType},
     },
 };
 
@@ -21,6 +28,20 @@ mod tools;
 mod widgets;
 
 // LYN: Main App State Holder
+
+#[derive(Debug)]
+pub struct MainState {
+    selected_pattern: RwLock<Option<Weak<SheetPattern>>>,
+}
+
+impl MainState {
+    pub fn selected_pattern(&self) -> RwLockReadGuard<'_, Option<Weak<SheetPattern>>> {
+        self.selected_pattern.read()
+    }
+    pub fn select_pattern(&self, pattern: Option<Weak<SheetPattern>>) {
+        *self.selected_pattern.write() = pattern;
+    }
+}
 
 #[derive(Debug)]
 pub struct MainApp {
@@ -34,6 +55,7 @@ pub struct MainApp {
     pub tools: Vec<Box<dyn ToolWindow>>,
 
     // routine states
+    pub main_state: Arc<MainState>,
     pub metronome: Arc<Metronome>,
     pub sheet_reader: Arc<SheetReader>,
 }
@@ -44,7 +66,24 @@ impl MainApp {
         let metronome = Arc::new(Metronome::new());
         let sheet_reader = Arc::new(SheetReader::new());
 
-        let tools: Vec<Box<dyn ToolWindow>> = vec![Box::new(Tester::default())];
+        let main_state = Arc::new(MainState {
+            selected_pattern: RwLock::new(None),
+        });
+
+        let tools: Vec<Box<dyn ToolWindow>> = vec![
+            Box::new(Tester::new(
+                main_state.clone(),
+                metronome.clone(),
+                sheet_reader.clone(),
+            )),
+            Box::new(PatternEditor::new(metronome.clone(), sheet_reader.clone())),
+        ];
+
+        // FIXME: test data
+        sheet_reader.add_pattern("Test 1".to_string(), SheetPatternType::Midi);
+        sheet_reader.add_pattern("Test 1".to_string(), SheetPatternType::Midi);
+        sheet_reader.add_pattern("Test 2".to_string(), SheetPatternType::Midi);
+        sheet_reader.add_pattern("Test 3".to_string(), SheetPatternType::Midi);
 
         thread::spawn({
             let state = metronome.clone();
@@ -64,6 +103,7 @@ impl MainApp {
             performance: Default::default(),
             error_modal: Default::default(),
             tools,
+            main_state,
             metronome,
             sheet_reader,
         }
@@ -103,6 +143,16 @@ impl eframe::App for MainApp {
 
         self.handle_ui_cmd();
 
+        if self
+            .main_state
+            .selected_pattern()
+            .as_ref()
+            .is_some_and(|ptr| ptr.upgrade().is_none())
+        {
+            self.main_state.select_pattern(None);
+            self.sheet_reader.set_context(SheetContext::Track);
+        }
+
         self.draw_ui(ctx);
         self.draw_active_tool_windows(ctx);
         self.error_modal.try_draw(ctx);
@@ -136,8 +186,7 @@ impl MainApp {
             });
         });
 
-        egui::SidePanel::left(WidgetId::MainAppLeftExplorerPanel)
-            .show(ctx, |ui| ui.label("explorer"));
+        egui::SidePanel::left(WidgetId::MainAppLeftExplorerPanel).show(ctx, |ui| self.explorer(ui));
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.label("Tracks");
@@ -158,15 +207,59 @@ impl MainApp {
     }
 
     fn context_control(&mut self, ui: &mut egui::Ui) {
-        // TODO: impl actual context swicher
-        ui.label(match *self.sheet_reader.context.read() {
-            SheetContext::Track => "Track".to_string(),
-            SheetContext::Pattern(ref pat) => pat
-                .upgrade()
-                .map(|pat| pat.name.clone())
-                .unwrap_or("ERROR".to_string()),
+        // context swicher
+        egui::Frame::NONE.show(ui, |ui| {
+            ui.spacing_mut().item_spacing = emath::vec2(0., 0.);
+            if ui
+                .add(
+                    egui::Button::new("󰲸 ")
+                        .selected(self.sheet_reader.context_is_track())
+                        .corner_radius(egui::CornerRadius {
+                            ne: 0,
+                            se: 0,
+                            ..ui.style().noninteractive().corner_radius
+                        })
+                        .frame_when_inactive(true),
+                )
+                .clicked()
+            {
+                self.sheet_reader.set_context(SheetContext::Track);
+            }
+
+            {
+                let selected_pattern = self.main_state.selected_pattern();
+
+                if ui
+                    .add_enabled(
+                        selected_pattern.is_some(),
+                        egui::Button::new(format!(
+                            "󰎅  {}",
+                            selected_pattern
+                                .as_ref()
+                                .map(|ptr| ptr
+                                    .upgrade()
+                                    .map(|pat| pat.name.clone())
+                                    .unwrap_or_default())
+                                .unwrap_or_default()
+                        ))
+                        .corner_radius(egui::CornerRadius {
+                            nw: 0,
+                            sw: 0,
+                            ..ui.style().noninteractive().corner_radius
+                        })
+                        .selected(!self.sheet_reader.context_is_track())
+                        .frame_when_inactive(true),
+                    )
+                    .clicked()
+                {
+                    self.sheet_reader.set_context(SheetContext::Pattern(
+                        selected_pattern.as_ref().unwrap().clone(),
+                    ));
+                }
+            }
         });
 
+        // play/pause control
         let playing = self.metronome.playing();
         if ui
             .add(
@@ -179,6 +272,7 @@ impl MainApp {
             self.metronome.toggle_playing(None);
         }
 
+        // stop control
         if ui
             .add_enabled(!self.metronome.stopped(), egui::Button::new(""))
             .clicked()
@@ -186,8 +280,9 @@ impl MainApp {
             self.metronome.stop();
         };
 
+        // bpm control
         ui.add(
-            egui::DragValue::new(self.metronome.bpm.write().deref_mut())
+            egui::DragValue::new(self.metronome.bpm_mut().deref_mut())
                 .range(1..=640)
                 .prefix("BPM "),
         );
@@ -196,7 +291,7 @@ impl MainApp {
         ui.label(format!(
             " {}/{:?}",
             self.metronome.query_tick(),
-            *self.metronome.top_tick.read()
+            self.metronome.top_tick()
         ));
     }
 
@@ -212,6 +307,33 @@ impl MainApp {
             {
                 tool.toggle_open(None);
             }
+        }
+    }
+
+    fn explorer(&mut self, ui: &mut egui::Ui) {
+        for pattern in self.sheet_reader.patterns().deref() {
+            if ui
+                .add(
+                    egui::Button::new(&pattern.name)
+                        .selected(
+                            self.main_state
+                                .selected_pattern()
+                                .as_ref()
+                                .is_some_and(|ptr| {
+                                    ptr.upgrade().is_some_and(|pat| pat.name == pattern.name)
+                                }),
+                        )
+                        .frame_when_inactive(true),
+                )
+                .clicked()
+            {
+                let pat_ptr = Arc::downgrade(pattern);
+                self.main_state.select_pattern(Some(pat_ptr.clone()));
+                if !self.sheet_reader.context_is_track() {
+                    self.sheet_reader
+                        .set_context(SheetContext::Pattern(pat_ptr));
+                }
+            };
         }
     }
 }

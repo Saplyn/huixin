@@ -5,7 +5,16 @@ pub enum WidgetId {
     MainAppTopToolBar,
     MainAppButtonStatusBar,
     MainAppLeftExplorerPanel,
+
     ErrorModal,
+
+    ToolWindowTest,
+    ToolWindowTestTopUtilBar,
+    ToolWindowTestRightDetailPanel,
+
+    ToolWindowPatternEditor,
+    ToolWindowPatternEditorTopUtilBar,
+    ToolWindowPatternEditorRightDetailPanel,
 }
 
 impl From<WidgetId> for egui::Id {
