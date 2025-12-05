@@ -6,7 +6,7 @@ use std::{
 
 use dashmap::DashSet;
 use log::{debug, error, info, warn};
-use parking_lot::{RwLock, RwLockReadGuard};
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     app::MainAppCmd,
@@ -23,8 +23,8 @@ const REQUEST_TICK_POLL_INTERVAL: Duration = Duration::from_millis(50);
 pub struct SheetReader {
     // core state
     context: RwLock<SheetContext>,
-    patterns: RwLock<Vec<Arc<SheetPattern>>>,
-    tracks: RwLock<Vec<SheetTrack>>,
+    patterns: RwLock<Vec<Arc<RwLock<SheetPattern>>>>,
+    tracks: RwLock<Vec<RwLock<SheetTrack>>>,
 
     // api state
     pattern_names: DashSet<String>,
@@ -45,7 +45,7 @@ impl SheetReader {
 pub enum SheetContext {
     #[default]
     Track,
-    Pattern(Weak<SheetPattern>),
+    Pattern(Weak<RwLock<SheetPattern>>),
 }
 
 // LYN: Sheet Reader Main Routine
@@ -77,52 +77,69 @@ fn main(state: Arc<SheetReader>, metro: Arc<Metronome>) {
 // LYN: Sheet Reader Public APIs
 
 impl SheetReader {
+    /// Returns the current context of the sheet reader.
     pub fn context(&self) -> SheetContext {
         self.context.read().clone()
     }
 
+    /// Returns true if the current context is set to `SheetContext::Track`.
     pub fn context_is_track(&self) -> bool {
         matches!(*self.context.read(), SheetContext::Track)
     }
 
+    /// Sets the current context of the sheet reader.
     pub fn set_context(&self, context: SheetContext) {
         *self.context.write() = context;
     }
 
-    pub fn patterns(&self) -> RwLockReadGuard<'_, Vec<Arc<SheetPattern>>> {
+    /// Returns a readable guard to the list of patterns.
+    pub fn patterns(&self) -> RwLockReadGuard<'_, Vec<Arc<RwLock<SheetPattern>>>> {
         self.patterns.read()
     }
 
+    /// Returns a readable guard to the list of patterns.
+    pub fn patterns_mut(&self) -> RwLockWriteGuard<'_, Vec<Arc<RwLock<SheetPattern>>>> {
+        self.patterns.write()
+    }
+
+    /// Adds a new pattern with the given name and type.
     pub fn add_pattern(
         &self,
         name: String,
         pattern_type: SheetPatternType,
-    ) -> Option<Arc<SheetPattern>> {
+    ) -> Option<Arc<RwLock<SheetPattern>>> {
         if self.pattern_names.contains(&name) {
             return None;
         }
 
-        let pattern = Arc::new(match pattern_type {
+        let pattern = Arc::new(RwLock::new(match pattern_type {
             SheetPatternType::Midi => SheetPattern {
                 name: name.clone(),
                 inner: SheetPatternInner::Midi(MidiPattern { notes: vec![] }),
             },
-        });
+        }));
         self.patterns.write().push(pattern.clone());
         self.pattern_names.insert(name);
         Some(pattern)
     }
 
-    pub fn del_pattern(&self, name: String) {
+    /// Deletes the pattern with the given name.
+    // TODO: maybe return a error type
+    pub fn del_pattern(&self, name: String) -> Result<(), ()> {
         if self.pattern_names.remove(&name).is_some() {
             let mut patterns = self.patterns.write();
-            if let Some(pos) = patterns.iter().position(|pat| pat.name == name) {
+            if let Some(pos) = patterns.iter().position(|pat| pat.read().name == name) {
                 patterns.remove(pos);
             }
+            Ok(())
         } else {
             warn!("Failed to delete pattern: {name} (not found)");
+            Err(())
         }
     }
 
-    pub fn add_track(&self) {}
+    /// Adds a new track to the sheet.
+    pub fn add_track(&self) {
+        todo!() // TODO: impl this
+    }
 }

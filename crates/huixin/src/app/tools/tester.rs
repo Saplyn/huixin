@@ -54,18 +54,15 @@ impl ToolWindow for Tester {
 
     fn draw(&mut self, ctx: &egui::Context) {
         egui::Window::new("Tester")
-            .id(WidgetId::ToolWindowTest.into())
+            .id(WidgetId::Tester.into())
             .frame(egui::Frame::window(&ctx.style()).inner_margin(0))
             .title_bar(false)
             .min_size(emath::vec2(400., 150.))
             .show(ctx, |ui| {
-                egui::TopBottomPanel::top(WidgetId::ToolWindowTestTopUtilBar).show_inside(
-                    ui,
-                    |ui| {
-                        self.top_util_bar(ui);
-                    },
-                );
-                egui::SidePanel::right(WidgetId::ToolWindowTestRightDetailPanel)
+                egui::TopBottomPanel::top(WidgetId::TesterTopUtilBar).show_inside(ui, |ui| {
+                    self.top_util_bar(ui);
+                });
+                egui::SidePanel::right(WidgetId::TesterRightDetailPanel)
                     .resizable(false)
                     .show_inside(ui, |ui| {
                         self.right_detail_panel(ui);
@@ -119,7 +116,7 @@ impl Tester {
                     SheetContext::Track => "Track".to_string(),
                     SheetContext::Pattern(pat_ptr) => pat_ptr
                         .upgrade()
-                        .map(|pat| pat.name.clone())
+                        .map(|pat| pat.read().name.clone())
                         .unwrap_or("[Invalid]".to_string()),
                 }
             ));

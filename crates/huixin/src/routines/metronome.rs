@@ -11,7 +11,7 @@ use parking_lot::{RwLock, RwLockWriteGuard};
 
 use crate::{app::MainAppCmd, routines::RoutineId};
 
-pub const TICK_PER_BEAT: u32 = 4;
+pub const TICK_PER_BEAT: u64 = 4;
 pub const SLEEP_PER_TICK: u32 = 50;
 pub const MAX_SLEEP_TIME: Duration = Duration::from_millis(50);
 

@@ -12,7 +12,9 @@ chrono = "0.4"
 # EGUI
 eframe = { workspace = true, features = ["default"] }
 egui = { workspace = true }
+ecolor = { workspace = true }
 emath = { workspace = true }
+egui_extras = { workspace = true }
 # Logging
 log = { workspace = true }
 simplelog = { workspace = true }

@@ -26,18 +26,24 @@ pub enum SheetPatternInner {
 
 #[derive(Debug)]
 pub struct MidiPattern {
-    pub notes: Vec<Timed<PianoNote>>,
+    pub notes: Vec<Timed<MidiNote>>,
 }
 
 #[derive(Debug)]
-pub struct PianoNote {
+pub struct MidiNote {
+    pub midicode: u8,
     pub strength: u16,
-    pub code: u8,
     pub length: u64,
 }
 
 impl MidiPattern {
-    fn get_action(&self, tick: u16) {}
+    pub fn notes_ref(&self) -> &Vec<Timed<MidiNote>> {
+        &self.notes
+    }
+
+    pub fn notes_mut(&mut self) -> &mut Vec<Timed<MidiNote>> {
+        &mut self.notes
+    }
 }
 
 // LYN: Pattern - Curve

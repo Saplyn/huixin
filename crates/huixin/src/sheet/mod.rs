@@ -1,5 +1,7 @@
 use std::sync::Weak;
 
+use parking_lot::RwLock;
+
 use crate::sheet::pattern::SheetPattern;
 
 pub mod pattern;
@@ -33,5 +35,5 @@ impl<T> Timed<T> {
 #[derive(Debug)]
 pub struct SheetTrack {
     pub name: String,
-    pub pattern: Vec<Timed<Weak<SheetPattern>>>,
+    pub pattern: Vec<Timed<Weak<RwLock<SheetPattern>>>>,
 }

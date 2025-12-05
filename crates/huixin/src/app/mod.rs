@@ -4,8 +4,7 @@ use std::{
     thread,
 };
 
-use egui::Button;
-use parking_lot::{RwLock, RwLockReadGuard};
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     app::{
@@ -14,12 +13,12 @@ use crate::{
         widgets::{error_modal::ErrorModal, performance::Performance},
     },
     routines::{
-        metronome::Metronome,
+        metronome::{Metronome, TICK_PER_BEAT},
         sheet_reader::{SheetContext, SheetReader},
     },
     sheet::{
-        SheetTrack,
-        pattern::{SheetPattern, SheetPatternType},
+        Timed,
+        pattern::{MidiNote, MidiPattern, SheetPattern, SheetPatternInner, SheetPatternType},
     },
 };
 
@@ -31,14 +30,17 @@ mod widgets;
 
 #[derive(Debug)]
 pub struct MainState {
-    selected_pattern: RwLock<Option<Weak<SheetPattern>>>,
+    selected_pattern: RwLock<Option<Weak<RwLock<SheetPattern>>>>,
 }
 
 impl MainState {
-    pub fn selected_pattern(&self) -> RwLockReadGuard<'_, Option<Weak<SheetPattern>>> {
+    pub fn selected_pattern(&self) -> RwLockReadGuard<'_, Option<Weak<RwLock<SheetPattern>>>> {
         self.selected_pattern.read()
     }
-    pub fn select_pattern(&self, pattern: Option<Weak<SheetPattern>>) {
+    pub fn selected_pattern_mut(&self) -> RwLockWriteGuard<'_, Option<Weak<RwLock<SheetPattern>>>> {
+        self.selected_pattern.write()
+    }
+    pub fn select_pattern(&self, pattern: Option<Weak<RwLock<SheetPattern>>>) {
         *self.selected_pattern.write() = pattern;
     }
 }
@@ -76,14 +78,54 @@ impl MainApp {
                 metronome.clone(),
                 sheet_reader.clone(),
             )),
-            Box::new(PatternEditor::new(metronome.clone(), sheet_reader.clone())),
+            Box::new(PatternEditor::new(
+                main_state.clone(),
+                metronome.clone(),
+                sheet_reader.clone(),
+            )),
         ];
 
         // FIXME: test data
         sheet_reader.add_pattern("Test 1".to_string(), SheetPatternType::Midi);
-        sheet_reader.add_pattern("Test 1".to_string(), SheetPatternType::Midi);
         sheet_reader.add_pattern("Test 2".to_string(), SheetPatternType::Midi);
         sheet_reader.add_pattern("Test 3".to_string(), SheetPatternType::Midi);
+        sheet_reader.patterns_mut().deref_mut()[0].write().inner =
+            SheetPatternInner::Midi(MidiPattern {
+                notes: vec![
+                    Timed::new(
+                        0,
+                        MidiNote {
+                            strength: u16::MAX,
+                            midicode: 60,
+                            length: TICK_PER_BEAT,
+                        },
+                    ),
+                    Timed::new(
+                        TICK_PER_BEAT,
+                        MidiNote {
+                            strength: u16::MAX,
+                            midicode: 61,
+                            length: TICK_PER_BEAT,
+                        },
+                    ),
+                    Timed::new(
+                        2 * TICK_PER_BEAT,
+                        MidiNote {
+                            strength: u16::MAX,
+                            midicode: 62,
+                            length: TICK_PER_BEAT,
+                        },
+                    ),
+                    Timed::new(
+                        3 * TICK_PER_BEAT,
+                        MidiNote {
+                            strength: u16::MAX,
+                            midicode: 63,
+                            length: TICK_PER_BEAT,
+                        },
+                    ),
+                ],
+            });
 
         thread::spawn({
             let state = metronome.clone();
@@ -156,7 +198,7 @@ impl eframe::App for MainApp {
         self.draw_ui(ctx);
         self.draw_active_tool_windows(ctx);
         self.error_modal.try_draw(ctx);
-        ctx.request_repaint();
+        ctx.request_repaint(); // Uncomment this for continuous repainting (fix some UI update issues)
     }
 }
 
@@ -238,7 +280,7 @@ impl MainApp {
                                 .as_ref()
                                 .map(|ptr| ptr
                                     .upgrade()
-                                    .map(|pat| pat.name.clone())
+                                    .map(|pat| pat.read().name.clone())
                                     .unwrap_or_default())
                                 .unwrap_or_default()
                         ))
@@ -314,13 +356,14 @@ impl MainApp {
         for pattern in self.sheet_reader.patterns().deref() {
             if ui
                 .add(
-                    egui::Button::new(&pattern.name)
+                    egui::Button::new(&pattern.read().name)
                         .selected(
                             self.main_state
                                 .selected_pattern()
                                 .as_ref()
                                 .is_some_and(|ptr| {
-                                    ptr.upgrade().is_some_and(|pat| pat.name == pattern.name)
+                                    ptr.upgrade()
+                                        .is_some_and(|pat| pat.read().name == pattern.read().name)
                                 }),
                         )
                         .frame_when_inactive(true),

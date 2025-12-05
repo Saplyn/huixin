@@ -8,13 +8,12 @@ pub enum WidgetId {
 
     ErrorModal,
 
-    ToolWindowTest,
-    ToolWindowTestTopUtilBar,
-    ToolWindowTestRightDetailPanel,
+    Tester,
+    TesterTopUtilBar,
+    TesterRightDetailPanel,
 
-    ToolWindowPatternEditor,
-    ToolWindowPatternEditorTopUtilBar,
-    ToolWindowPatternEditorRightDetailPanel,
+    PatternEditor,
+    PatternEditorMidiUtilBar,
 }
 
 impl From<WidgetId> for egui::Id {

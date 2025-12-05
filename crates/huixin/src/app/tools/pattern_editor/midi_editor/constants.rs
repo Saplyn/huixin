@@ -1,0 +1,6 @@
+pub const NUMBER_OF_KEYS: u32 = 128;
+pub const NUMBER_OF_WHITE_KEYS: u32 = 75;
+pub const NUMBER_OF_BLACK_KEYS: u32 = NUMBER_OF_KEYS - NUMBER_OF_WHITE_KEYS;
+pub const KEY_ROW_HEIGHT: f32 = 18.;
+pub const KEY_ROW_WIDTH: f32 = 50.;
+pub const BLACK_KEY_WIDTH_SCALE: f32 = 0.7;
