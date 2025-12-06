@@ -1,9 +1,4 @@
-use std::{
-    ops::{Deref, DerefMut},
-    sync::Arc,
-};
-
-use self::midi_editor::{constants::KEY_ROW_HEIGHT, midi_keyboard::MidiKeyboard};
+use std::{ops::DerefMut, sync::Arc};
 
 use crate::{
     app::{
@@ -11,11 +6,11 @@ use crate::{
         helpers::WidgetId,
         tools::{
             ToolWindow,
-            pattern_editor::midi_editor::{MidiEditor, constants::NUMBER_OF_KEYS},
+            pattern_editor::midi_editor::{MidiEditor, MidiEditorState},
         },
     },
     routines::{metronome::Metronome, sheet_reader::SheetReader},
-    sheet::pattern::SheetPatternInner,
+    sheet::pattern::SheetPattern,
 };
 
 mod midi_editor;
@@ -26,6 +21,7 @@ mod midi_editor;
 pub struct PatternEditor {
     // ui states
     open: bool,
+    midi_editor_state: MidiEditorState,
 
     // logic states
     main_state: Arc<MainState>,
@@ -41,6 +37,7 @@ impl PatternEditor {
     ) -> Self {
         Self {
             open: true,
+            midi_editor_state: MidiEditorState::default(),
             main_state,
             metronome,
             sheet_reader,
@@ -95,9 +92,10 @@ impl ToolWindow for PatternEditor {
                 let Some(mut pat) = pat_guard.as_deref().map(|pat| pat.write()) else {
                     return;
                 };
-                match pat.deref_mut().inner {
-                    SheetPatternInner::Midi(ref mut pat) => {
-                        let output = MidiEditor::new(pat).show_inside(ui);
+                match pat.deref_mut() {
+                    SheetPattern::Midi(pat) => {
+                        let output =
+                            MidiEditor::new(&mut self.midi_editor_state, pat).show_inside(ui);
                     }
                 };
             });

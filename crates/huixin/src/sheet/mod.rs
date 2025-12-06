@@ -6,34 +6,21 @@ use crate::sheet::pattern::SheetPattern;
 
 pub mod pattern;
 
-// LYN: Timed
-
-#[derive(Debug)]
-pub struct Timed<T> {
-    pub tick: u64,
-    pub inner: T,
-}
-
-#[allow(unused)] // TODO:
-impl<T> Timed<T> {
-    pub fn new(tick: u64, inner: T) -> Self {
-        Self { tick, inner }
-    }
-    pub fn flatten(self) -> (u64, T) {
-        (self.tick, self.inner)
-    }
-    pub fn flatten_ref(&self) -> (u64, &T) {
-        (self.tick, &self.inner)
-    }
-    pub fn flatten_mut(&mut self) -> (u64, &mut T) {
-        (self.tick, &mut self.inner)
-    }
-}
-
 // LYN: Track
 
 #[derive(Debug)]
-pub struct SheetTrack {
+pub enum SheetTrack {
+    Pattern(PatternTrack),
+}
+
+#[derive(Debug)]
+pub struct PatternTrack {
     pub name: String,
-    pub pattern: Vec<Timed<Weak<RwLock<SheetPattern>>>>,
+    pub patterns: Vec<Weak<RwLock<SheetPattern>>>,
+}
+
+#[derive(Debug)]
+pub struct EventTrack {
+    pub name: String,
+    // event vec, target
 }

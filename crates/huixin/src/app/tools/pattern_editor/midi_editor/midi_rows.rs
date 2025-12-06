@@ -1,22 +1,26 @@
-use crate::sheet::pattern::MidiPattern;
+use crate::sheet::pattern::{SheetPatternTrait, midi::MidiPattern};
 
 use super::constants::{KEY_ROW_HEIGHT, NUMBER_OF_KEYS};
 
 #[derive(Debug)]
 pub struct MidiRows<'pat> {
+    size_per_beat: f32,
     midi_pattern: &'pat mut MidiPattern,
 }
 
 impl<'pat> MidiRows<'pat> {
-    pub fn new(midi_pattern: &'pat mut MidiPattern) -> Self {
-        Self { midi_pattern }
+    pub fn new(size_per_beat: f32, midi_pattern: &'pat mut MidiPattern) -> Self {
+        Self {
+            size_per_beat,
+            midi_pattern,
+        }
     }
 }
 
 impl<'pat> egui::Widget for MidiRows<'pat> {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let desired_size =
-            emath::vec2(ui.available_width(), NUMBER_OF_KEYS as f32 * KEY_ROW_HEIGHT);
+        let width = self.midi_pattern.beats() as f32 * self.size_per_beat;
+        let desired_size = emath::vec2(width, NUMBER_OF_KEYS as f32 * KEY_ROW_HEIGHT);
         let (rect, resp) = ui.allocate_exact_size(desired_size, egui::Sense::all());
 
         if ui.is_rect_visible(rect) {

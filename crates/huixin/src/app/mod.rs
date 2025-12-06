@@ -16,9 +16,9 @@ use crate::{
         metronome::{Metronome, TICK_PER_BEAT},
         sheet_reader::{SheetContext, SheetReader},
     },
-    sheet::{
-        Timed,
-        pattern::{MidiNote, MidiPattern, SheetPattern, SheetPatternInner, SheetPatternType},
+    sheet::pattern::{
+        SheetPattern, SheetPatternTrait, SheetPatternType,
+        midi::{MidiNote, MidiPattern},
     },
 };
 
@@ -65,12 +65,12 @@ pub struct MainApp {
 impl MainApp {
     pub fn prepare() -> Self {
         let (cmd_tx, cmd_rx) = mpsc::channel();
-        let metronome = Arc::new(Metronome::new());
-        let sheet_reader = Arc::new(SheetReader::new());
 
         let main_state = Arc::new(MainState {
             selected_pattern: RwLock::new(None),
         });
+        let metronome = Arc::new(Metronome::new());
+        let sheet_reader = Arc::new(SheetReader::new(main_state.clone()));
 
         let tools: Vec<Box<dyn ToolWindow>> = vec![
             Box::new(Tester::new(
@@ -89,43 +89,37 @@ impl MainApp {
         sheet_reader.add_pattern("Test 1".to_string(), SheetPatternType::Midi);
         sheet_reader.add_pattern("Test 2".to_string(), SheetPatternType::Midi);
         sheet_reader.add_pattern("Test 3".to_string(), SheetPatternType::Midi);
-        sheet_reader.patterns_mut().deref_mut()[0].write().inner =
-            SheetPatternInner::Midi(MidiPattern {
-                notes: vec![
-                    Timed::new(
-                        0,
-                        MidiNote {
-                            strength: u16::MAX,
-                            midicode: 60,
-                            length: TICK_PER_BEAT,
-                        },
-                    ),
-                    Timed::new(
-                        TICK_PER_BEAT,
-                        MidiNote {
-                            strength: u16::MAX,
-                            midicode: 61,
-                            length: TICK_PER_BEAT,
-                        },
-                    ),
-                    Timed::new(
-                        2 * TICK_PER_BEAT,
-                        MidiNote {
-                            strength: u16::MAX,
-                            midicode: 62,
-                            length: TICK_PER_BEAT,
-                        },
-                    ),
-                    Timed::new(
-                        3 * TICK_PER_BEAT,
-                        MidiNote {
-                            strength: u16::MAX,
-                            midicode: 63,
-                            length: TICK_PER_BEAT,
-                        },
-                    ),
-                ],
-            });
+        *sheet_reader.patterns_mut().deref_mut()[0].write() = SheetPattern::Midi(MidiPattern {
+            name: "Test 1".to_string(),
+            icon: String::from("󰄛 "),
+            beats: 4,
+            notes: vec![
+                MidiNote {
+                    midicode: 60,
+                    strength: u16::MAX,
+                    start: 0,
+                    length: TICK_PER_BEAT,
+                },
+                MidiNote {
+                    strength: u16::MAX,
+                    midicode: 61,
+                    start: TICK_PER_BEAT,
+                    length: TICK_PER_BEAT,
+                },
+                MidiNote {
+                    strength: u16::MAX,
+                    midicode: 62,
+                    start: 2 * TICK_PER_BEAT,
+                    length: TICK_PER_BEAT,
+                },
+                MidiNote {
+                    strength: u16::MAX,
+                    midicode: 63,
+                    start: 3 * TICK_PER_BEAT,
+                    length: TICK_PER_BEAT,
+                },
+            ],
+        });
 
         thread::spawn({
             let state = metronome.clone();
@@ -249,7 +243,7 @@ impl MainApp {
     }
 
     fn context_control(&mut self, ui: &mut egui::Ui) {
-        // context swicher
+        // context switcher
         egui::Frame::NONE.show(ui, |ui| {
             ui.spacing_mut().item_spacing = emath::vec2(0., 0.);
             if ui
@@ -266,6 +260,7 @@ impl MainApp {
                 .clicked()
             {
                 self.sheet_reader.set_context(SheetContext::Track);
+                self.metronome.set_top_tick(None);
             }
 
             {
@@ -280,7 +275,7 @@ impl MainApp {
                                 .as_ref()
                                 .map(|ptr| ptr
                                     .upgrade()
-                                    .map(|pat| pat.read().name.clone())
+                                    .map(|pat| pat.read().name_ref().to_owned())
                                     .unwrap_or_default())
                                 .unwrap_or_default()
                         ))
@@ -297,6 +292,23 @@ impl MainApp {
                     self.sheet_reader.set_context(SheetContext::Pattern(
                         selected_pattern.as_ref().unwrap().clone(),
                     ));
+                    self.metronome.set_top_tick(
+                        selected_pattern
+                            .as_ref()
+                            .unwrap()
+                            .upgrade()
+                            .is_some()
+                            .then(|| {
+                                selected_pattern
+                                    .as_ref()
+                                    .unwrap()
+                                    .upgrade()
+                                    .unwrap()
+                                    .read()
+                                    .beats()
+                                    * TICK_PER_BEAT
+                            }),
+                    );
                 }
             }
         });
@@ -356,14 +368,15 @@ impl MainApp {
         for pattern in self.sheet_reader.patterns().deref() {
             if ui
                 .add(
-                    egui::Button::new(&pattern.read().name)
+                    egui::Button::new(pattern.read().name_ref())
                         .selected(
                             self.main_state
                                 .selected_pattern()
                                 .as_ref()
                                 .is_some_and(|ptr| {
-                                    ptr.upgrade()
-                                        .is_some_and(|pat| pat.read().name == pattern.read().name)
+                                    ptr.upgrade().is_some_and(|pat| {
+                                        pat.read().name_ref() == pattern.read().name_ref()
+                                    })
                                 }),
                         )
                         .frame_when_inactive(true),
@@ -375,6 +388,8 @@ impl MainApp {
                 if !self.sheet_reader.context_is_track() {
                     self.sheet_reader
                         .set_context(SheetContext::Pattern(pat_ptr));
+                    self.metronome
+                        .set_top_tick(Some(pattern.read().beats() * TICK_PER_BEAT));
                 }
             };
         }

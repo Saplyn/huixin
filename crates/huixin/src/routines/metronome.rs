@@ -130,6 +130,11 @@ impl Metronome {
         *self.top_tick.read()
     }
 
+    /// Sets the top tick.
+    pub fn set_top_tick(&self, tick: Option<u64>) {
+        *self.top_tick.write() = tick;
+    }
+
     /// Returns the BPM value.
     pub fn bpm(&self) -> f64 {
         *self.bpm.read()

@@ -9,11 +9,11 @@ use log::{debug, error, info, warn};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
-    app::MainAppCmd,
+    app::{MainAppCmd, MainState},
     routines::{RoutineId, metronome::Metronome},
     sheet::{
         SheetTrack,
-        pattern::{MidiPattern, SheetPattern, SheetPatternInner, SheetPatternType},
+        pattern::{SheetPattern, SheetPatternTrait, SheetPatternType, midi::MidiPattern},
     },
 };
 
@@ -28,15 +28,19 @@ pub struct SheetReader {
 
     // api state
     pattern_names: DashSet<String>,
+
+    // logic state
+    main_state: Arc<MainState>,
 }
 
 impl SheetReader {
-    pub fn new() -> Self {
+    pub fn new(main_state: Arc<MainState>) -> Self {
         Self {
             context: Default::default(),
             patterns: Default::default(),
             tracks: RwLock::new(Vec::new()),
             pattern_names: DashSet::default(),
+            main_state,
         }
     }
 }
@@ -66,11 +70,12 @@ fn main(state: Arc<SheetReader>, metro: Arc<Metronome>) {
     info!("Sheet-reader started");
 
     loop {
-        // wait for tick change
-        if let Some(tick) = metro.request_tick(RoutineId::SheetReader) {
-            debug!("{tick}");
-        }
-        thread::sleep(REQUEST_TICK_POLL_INTERVAL);
+        let Some(tick) = metro.request_tick(RoutineId::SheetReader) else {
+            thread::sleep(REQUEST_TICK_POLL_INTERVAL);
+            continue;
+        };
+
+        debug!("{tick}");
     }
 }
 
@@ -113,10 +118,7 @@ impl SheetReader {
         }
 
         let pattern = Arc::new(RwLock::new(match pattern_type {
-            SheetPatternType::Midi => SheetPattern {
-                name: name.clone(),
-                inner: SheetPatternInner::Midi(MidiPattern { notes: vec![] }),
-            },
+            SheetPatternType::Midi => SheetPattern::Midi(MidiPattern::new(name.clone())),
         }));
         self.patterns.write().push(pattern.clone());
         self.pattern_names.insert(name);
@@ -128,7 +130,10 @@ impl SheetReader {
     pub fn del_pattern(&self, name: String) -> Result<(), ()> {
         if self.pattern_names.remove(&name).is_some() {
             let mut patterns = self.patterns.write();
-            if let Some(pos) = patterns.iter().position(|pat| pat.read().name == name) {
+            if let Some(pos) = patterns
+                .iter()
+                .position(|pat| pat.read().name_ref() == &name)
+            {
                 patterns.remove(pos);
             }
             Ok(())

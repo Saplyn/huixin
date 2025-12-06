@@ -1,12 +1,8 @@
-use crate::sheet::Timed;
+use self::midi::MidiPattern;
 
-// LYN: Pattern
-
-#[derive(Debug)]
-pub struct SheetPattern {
-    pub name: String,
-    pub inner: SheetPatternInner,
-}
+pub mod curve;
+pub mod event;
+pub mod midi;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum SheetPatternType {
@@ -16,44 +12,60 @@ pub enum SheetPatternType {
 }
 
 #[derive(Debug)]
-pub enum SheetPatternInner {
+pub enum SheetPattern {
     Midi(MidiPattern),
     // Curve(CurvePattern),
     // Event(EventPattern),
 }
 
-// LYN: Pattern - Midi
+pub trait SheetPatternTrait {
+    fn name_ref(&self) -> &String;
+    fn name_mut(&mut self) -> &mut String;
+    fn set_name(&mut self, name: String);
 
-#[derive(Debug)]
-pub struct MidiPattern {
-    pub notes: Vec<Timed<MidiNote>>,
+    fn icon_ref(&self) -> &String;
+    fn icon_mut(&mut self) -> &mut String;
+    fn set_icon(&mut self, icon: String);
+
+    fn beats(&self) -> u64;
 }
 
-#[derive(Debug)]
-pub struct MidiNote {
-    pub midicode: u8,
-    pub strength: u16,
-    pub length: u64,
-}
-
-impl MidiPattern {
-    pub fn notes_ref(&self) -> &Vec<Timed<MidiNote>> {
-        &self.notes
+impl SheetPatternTrait for SheetPattern {
+    fn name_ref(&self) -> &String {
+        match self {
+            Self::Midi(pat) => pat.name_ref(),
+        }
+    }
+    fn name_mut(&mut self) -> &mut String {
+        match self {
+            Self::Midi(pat) => pat.name_mut(),
+        }
+    }
+    fn set_name(&mut self, name: String) {
+        match self {
+            Self::Midi(pat) => pat.set_name(name),
+        }
     }
 
-    pub fn notes_mut(&mut self) -> &mut Vec<Timed<MidiNote>> {
-        &mut self.notes
+    fn icon_ref(&self) -> &String {
+        match self {
+            Self::Midi(pat) => pat.icon_ref(),
+        }
+    }
+    fn icon_mut(&mut self) -> &mut String {
+        match self {
+            Self::Midi(pat) => pat.icon_mut(),
+        }
+    }
+    fn set_icon(&mut self, icon: String) {
+        match self {
+            Self::Midi(pat) => pat.set_icon(icon),
+        }
+    }
+
+    fn beats(&self) -> u64 {
+        match self {
+            Self::Midi(pat) => pat.beats(),
+        }
     }
 }
-
-// LYN: Pattern - Curve
-
-// #[derive(Debug)]
-// pub struct CurvePattern {
-//     vals: Vec<Timed<f64>>,
-// }
-
-// LYN: Pattern - Event
-
-// #[derive(Debug)]
-// pub struct EventPattern {}

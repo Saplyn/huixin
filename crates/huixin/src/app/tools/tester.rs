@@ -6,6 +6,7 @@ use crate::{
         metronome::Metronome,
         sheet_reader::{SheetContext, SheetReader},
     },
+    sheet::pattern::SheetPatternTrait,
 };
 
 #[derive(Debug)]
@@ -116,7 +117,7 @@ impl Tester {
                     SheetContext::Track => "Track".to_string(),
                     SheetContext::Pattern(pat_ptr) => pat_ptr
                         .upgrade()
-                        .map(|pat| pat.read().name.clone())
+                        .map(|pat| pat.read().name_ref().to_owned())
                         .unwrap_or("[Invalid]".to_string()),
                 }
             ));
