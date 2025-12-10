@@ -1,4 +1,4 @@
-use lyn_util::EguiContextExt;
+use lyn_util::egui::EguiContextExt;
 use simplelog::TermLogger;
 
 use crate::app::MainApp;

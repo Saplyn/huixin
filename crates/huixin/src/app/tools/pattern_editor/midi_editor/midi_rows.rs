@@ -15,13 +15,11 @@ impl<'pat> MidiRows<'pat> {
             midi_pattern,
         }
     }
-}
 
-impl<'pat> egui::Widget for MidiRows<'pat> {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let width = self.midi_pattern.beats() as f32 * self.size_per_beat;
-        let desired_size = emath::vec2(width, NUMBER_OF_KEYS as f32 * KEY_ROW_HEIGHT);
-        let (rect, resp) = ui.allocate_exact_size(desired_size, egui::Sense::all());
+    pub fn show(self, ui: &mut egui::Ui) {
+        let total_width = self.midi_pattern.beats() as f32 * self.size_per_beat;
+        let desired_size = emath::vec2(total_width, NUMBER_OF_KEYS as f32 * KEY_ROW_HEIGHT);
+        let (rect, resp) = ui.allocate_exact_size(desired_size, egui::Sense::click_and_drag());
 
         if ui.is_rect_visible(rect) {
             let painter = ui.painter_at(rect);
@@ -36,6 +34,14 @@ impl<'pat> egui::Widget for MidiRows<'pat> {
             }
         }
 
-        resp
+        // DEBUG: Map pointer position to key id on click or drag
+        if let Some(pos) = resp.interact_pointer_pos()
+            && (resp.clicked() || resp.dragged())
+        {
+            // Translate global pointer pos to local row space
+            let local_y = pos.y - rect.top();
+            let key_id = 127 - ((local_y / KEY_ROW_HEIGHT).floor() as u32).min(127);
+            println!("Clicked key id: {}", key_id);
+        }
     }
 }

@@ -118,7 +118,7 @@ impl SheetReader {
         }
 
         let pattern = Arc::new(RwLock::new(match pattern_type {
-            SheetPatternType::Midi => SheetPattern::Midi(MidiPattern::new(name.clone())),
+            SheetPatternType::Midi => SheetPattern::Midi(MidiPattern::new(name.clone(), None)),
         }));
         self.patterns.write().push(pattern.clone());
         self.pattern_names.insert(name);

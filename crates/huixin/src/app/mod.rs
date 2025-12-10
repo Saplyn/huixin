@@ -89,37 +89,17 @@ impl MainApp {
         sheet_reader.add_pattern("Test 1".to_string(), SheetPatternType::Midi);
         sheet_reader.add_pattern("Test 2".to_string(), SheetPatternType::Midi);
         sheet_reader.add_pattern("Test 3".to_string(), SheetPatternType::Midi);
-        *sheet_reader.patterns_mut().deref_mut()[0].write() = SheetPattern::Midi(MidiPattern {
-            name: "Test 1".to_string(),
-            icon: String::from("󰄛 "),
-            beats: 4,
-            notes: vec![
-                MidiNote {
-                    midicode: 60,
-                    strength: u16::MAX,
-                    start: 0,
-                    length: TICK_PER_BEAT,
-                },
-                MidiNote {
-                    strength: u16::MAX,
-                    midicode: 61,
-                    start: TICK_PER_BEAT,
-                    length: TICK_PER_BEAT,
-                },
-                MidiNote {
-                    strength: u16::MAX,
-                    midicode: 62,
-                    start: 2 * TICK_PER_BEAT,
-                    length: TICK_PER_BEAT,
-                },
-                MidiNote {
-                    strength: u16::MAX,
-                    midicode: 63,
-                    start: 3 * TICK_PER_BEAT,
-                    length: TICK_PER_BEAT,
-                },
-            ],
-        });
+        *sheet_reader.patterns_mut().deref_mut()[0].write() = {
+            let mut pat = MidiPattern::new("Test 1".to_string(), None);
+            pat.beats = 4;
+            let tmp = TICK_PER_BEAT;
+            pat.add_note(MidiNote::new(61, u16::MAX, tmp, tmp));
+            pat.add_note(MidiNote::new(60, u16::MAX, 0, tmp));
+            pat.add_note(MidiNote::new(63, u16::MAX, 3 * tmp, tmp));
+            pat.add_note(MidiNote::new(62, u16::MAX, 2 * tmp, tmp));
+
+            SheetPattern::Midi(pat)
+        };
 
         thread::spawn({
             let state = metronome.clone();
