@@ -2,11 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     app::{MainState, helpers::WidgetId, tools::ToolWindow},
-    routines::{
-        metronome::Metronome,
-        sheet_reader::{SheetContext, SheetReader},
-    },
-    sheet::pattern::SheetPatternTrait,
+    routines::{metronome::Metronome, sheet_reader::SheetReader},
 };
 
 #[derive(Debug)]
@@ -111,16 +107,6 @@ impl Tester {
             ));
             ui.code(format!("{:#?}", self.main_state));
             ui.separator();
-            ui.code(format!(
-                "*context: {}",
-                match self.sheet_reader.context() {
-                    SheetContext::Track => "Track".to_string(),
-                    SheetContext::Pattern(pat_ptr) => pat_ptr
-                        .upgrade()
-                        .map(|pat| pat.read().name_ref().to_owned())
-                        .unwrap_or("[Invalid]".to_string()),
-                }
-            ));
             ui.code(format!("{:#?}", self.sheet_reader));
             ui.separator();
             ui.code(format!("{:#?}", self.metronome));

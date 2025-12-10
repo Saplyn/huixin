@@ -22,7 +22,6 @@ const REQUEST_TICK_POLL_INTERVAL: Duration = Duration::from_millis(50);
 #[derive(Debug)]
 pub struct SheetReader {
     // core state
-    context: RwLock<SheetContext>,
     patterns: RwLock<Vec<Arc<RwLock<SheetPattern>>>>,
     tracks: RwLock<Vec<RwLock<SheetTrack>>>,
 
@@ -36,20 +35,12 @@ pub struct SheetReader {
 impl SheetReader {
     pub fn new(main_state: Arc<MainState>) -> Self {
         Self {
-            context: Default::default(),
             patterns: Default::default(),
             tracks: RwLock::new(Vec::new()),
             pattern_names: DashSet::default(),
             main_state,
         }
     }
-}
-
-#[derive(Debug, Default, Clone)]
-pub enum SheetContext {
-    #[default]
-    Track,
-    Pattern(Weak<RwLock<SheetPattern>>),
 }
 
 // LYN: Sheet Reader Main Routine
@@ -82,21 +73,6 @@ fn main(state: Arc<SheetReader>, metro: Arc<Metronome>) {
 // LYN: Sheet Reader Public APIs
 
 impl SheetReader {
-    /// Returns the current context of the sheet reader.
-    pub fn context(&self) -> SheetContext {
-        self.context.read().clone()
-    }
-
-    /// Returns true if the current context is set to `SheetContext::Track`.
-    pub fn context_is_track(&self) -> bool {
-        matches!(*self.context.read(), SheetContext::Track)
-    }
-
-    /// Sets the current context of the sheet reader.
-    pub fn set_context(&self, context: SheetContext) {
-        *self.context.write() = context;
-    }
-
     /// Returns a readable guard to the list of patterns.
     pub fn patterns(&self) -> RwLockReadGuard<'_, Vec<Arc<RwLock<SheetPattern>>>> {
         self.patterns.read()

@@ -14,7 +14,7 @@ use crate::{
     },
     routines::{
         metronome::{Metronome, TICK_PER_BEAT},
-        sheet_reader::{SheetContext, SheetReader},
+        sheet_reader::SheetReader,
     },
     sheet::pattern::{
         SheetPattern, SheetPatternTrait, SheetPatternType,
@@ -28,9 +28,17 @@ mod widgets;
 
 // LYN: Main App State Holder
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum PlayerContext {
+    #[default]
+    Track,
+    Pattern,
+}
+
 #[derive(Debug)]
 pub struct MainState {
     selected_pattern: RwLock<Option<Weak<RwLock<SheetPattern>>>>,
+    player_context: RwLock<PlayerContext>,
 }
 
 impl MainState {
@@ -42,6 +50,12 @@ impl MainState {
     }
     pub fn select_pattern(&self, pattern: Option<Weak<RwLock<SheetPattern>>>) {
         *self.selected_pattern.write() = pattern;
+    }
+    pub fn set_context(&self, context: PlayerContext) {
+        *self.player_context.write() = context;
+    }
+    pub fn player_context(&self) -> PlayerContext {
+        *self.player_context.read()
     }
 }
 
@@ -68,8 +82,9 @@ impl MainApp {
 
         let main_state = Arc::new(MainState {
             selected_pattern: RwLock::new(None),
+            player_context: RwLock::new(PlayerContext::Track),
         });
-        let metronome = Arc::new(Metronome::new());
+        let metronome = Arc::new(Metronome::new(main_state.clone()));
         let sheet_reader = Arc::new(SheetReader::new(main_state.clone()));
 
         let tools: Vec<Box<dyn ToolWindow>> = vec![
@@ -166,7 +181,7 @@ impl eframe::App for MainApp {
             .is_some_and(|ptr| ptr.upgrade().is_none())
         {
             self.main_state.select_pattern(None);
-            self.sheet_reader.set_context(SheetContext::Track);
+            self.main_state.set_context(PlayerContext::Track);
         }
 
         self.draw_ui(ctx);
@@ -229,7 +244,7 @@ impl MainApp {
             if ui
                 .add(
                     egui::Button::new("󰲸 ")
-                        .selected(self.sheet_reader.context_is_track())
+                        .selected(self.main_state.player_context() == PlayerContext::Track)
                         .corner_radius(egui::CornerRadius {
                             ne: 0,
                             se: 0,
@@ -239,8 +254,7 @@ impl MainApp {
                 )
                 .clicked()
             {
-                self.sheet_reader.set_context(SheetContext::Track);
-                self.metronome.set_top_tick(None);
+                self.main_state.set_context(PlayerContext::Track);
             }
 
             {
@@ -264,31 +278,12 @@ impl MainApp {
                             sw: 0,
                             ..ui.style().noninteractive().corner_radius
                         })
-                        .selected(!self.sheet_reader.context_is_track())
+                        .selected(self.main_state.player_context() == PlayerContext::Pattern)
                         .frame_when_inactive(true),
                     )
                     .clicked()
                 {
-                    self.sheet_reader.set_context(SheetContext::Pattern(
-                        selected_pattern.as_ref().unwrap().clone(),
-                    ));
-                    self.metronome.set_top_tick(
-                        selected_pattern
-                            .as_ref()
-                            .unwrap()
-                            .upgrade()
-                            .is_some()
-                            .then(|| {
-                                selected_pattern
-                                    .as_ref()
-                                    .unwrap()
-                                    .upgrade()
-                                    .unwrap()
-                                    .read()
-                                    .beats()
-                                    * TICK_PER_BEAT
-                            }),
-                    );
+                    self.main_state.set_context(PlayerContext::Pattern);
                 }
             }
         });
@@ -348,29 +343,27 @@ impl MainApp {
         for pattern in self.sheet_reader.patterns().deref() {
             if ui
                 .add(
-                    egui::Button::new(pattern.read().name_ref())
-                        .selected(
-                            self.main_state
-                                .selected_pattern()
-                                .as_ref()
-                                .is_some_and(|ptr| {
-                                    ptr.upgrade().is_some_and(|pat| {
-                                        pat.read().name_ref() == pattern.read().name_ref()
-                                    })
-                                }),
-                        )
-                        .frame_when_inactive(true),
+                    egui::Button::new(format!(
+                        "{} {}",
+                        pattern.read().icon_ref(),
+                        pattern.read().name_ref()
+                    ))
+                    .selected(
+                        self.main_state
+                            .selected_pattern()
+                            .as_ref()
+                            .is_some_and(|ptr| {
+                                ptr.upgrade().is_some_and(|pat| {
+                                    pat.read().name_ref() == pattern.read().name_ref()
+                                })
+                            }),
+                    )
+                    .frame_when_inactive(true),
                 )
                 .clicked()
             {
                 let pat_ptr = Arc::downgrade(pattern);
                 self.main_state.select_pattern(Some(pat_ptr.clone()));
-                if !self.sheet_reader.context_is_track() {
-                    self.sheet_reader
-                        .set_context(SheetContext::Pattern(pat_ptr));
-                    self.metronome
-                        .set_top_tick(Some(pattern.read().beats() * TICK_PER_BEAT));
-                }
             };
         }
     }

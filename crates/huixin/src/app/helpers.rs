@@ -14,7 +14,8 @@ pub enum WidgetId {
 
     PatternEditor,
     PatternEditorMidiUtilBar,
-    PatternEditorMidiNoteLayer,
+    PatternEditorMidiDetailPanel,
+    PatternEditorMidiDetailPanelGrid,
 }
 
 impl From<WidgetId> for egui::Id {

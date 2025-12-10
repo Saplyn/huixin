@@ -1,13 +1,6 @@
-use std::cmp::min;
-
-use self::{
-    constants::KEY_ROW_HEIGHT, midi_keyboard::MidiKeyboard, midi_note::MidiNoteWidget,
-    midi_rows::MidiRows,
-};
+use self::{midi_keyboard::MidiKeyboard, midi_note::MidiNoteWidget, midi_rows::MidiRows};
 use crate::{
-    app::helpers::WidgetId,
-    routines::metronome::TICK_PER_BEAT,
-    sheet::pattern::midi::{MidiNote, MidiPattern},
+    app::helpers::WidgetId, routines::metronome::TICK_PER_BEAT, sheet::pattern::midi::MidiPattern,
 };
 
 pub mod constants;
@@ -17,6 +10,8 @@ pub mod midi_rows;
 
 const MIN_SIZE_PER_BEAT: f32 = 40.;
 const MAX_SIZE_PER_BEAT: f32 = 400.;
+
+// LYN: Editor Externally Held State
 
 #[derive(Debug)]
 pub struct MidiEditorState {
@@ -31,14 +26,13 @@ impl Default for MidiEditorState {
     }
 }
 
+// LYN: Midi Editor State
+
 #[derive(Debug)]
 pub struct MidiEditor<'pat, 'state> {
     state: &'state mut MidiEditorState,
     midi_pattern: &'pat mut MidiPattern,
 }
-
-#[derive(Debug)]
-pub struct MidiEditorOutput {}
 
 impl<'pat, 'state> MidiEditor<'pat, 'state> {
     pub fn new(state: &'state mut MidiEditorState, midi_pattern: &'pat mut MidiPattern) -> Self {
@@ -50,7 +44,15 @@ impl<'pat, 'state> MidiEditor<'pat, 'state> {
 }
 
 impl<'pat, 'state> MidiEditor<'pat, 'state> {
-    pub fn show_inside(mut self, ui: &mut egui::Ui) -> MidiEditorOutput {
+    pub fn show_inside(mut self, ui: &mut egui::Ui) {
+        egui::SidePanel::right(WidgetId::PatternEditorMidiDetailPanel)
+            .resizable(false)
+            .min_width(150.)
+            .default_width(150.)
+            .show_inside(ui, |ui| {
+                self.detail_panel(ui);
+            });
+
         egui::TopBottomPanel::top(WidgetId::PatternEditorMidiUtilBar)
             .frame(egui::Frame::NONE.inner_margin(4.))
             .show_inside(ui, |ui| {
@@ -60,7 +62,7 @@ impl<'pat, 'state> MidiEditor<'pat, 'state> {
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing = emath::vec2(0., 0.);
-                let midi_keyboard_resp = ui.add(MidiKeyboard);
+                MidiKeyboard.show(ui);
 
                 egui::ScrollArea::horizontal().show(ui, |ui| {
                     MidiRows::new(self.state.size_per_beat, self.midi_pattern).show(ui);
@@ -79,8 +81,6 @@ impl<'pat, 'state> MidiEditor<'pat, 'state> {
                 });
             })
         });
-
-        MidiEditorOutput {}
     }
 }
 
@@ -88,15 +88,27 @@ impl<'pat, 'state> MidiEditor<'pat, 'state> {
     fn util_bar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("util bar");
-            // TODO: calc & impl actual max location
-            // let max_loc = 128;
-            // ui.add(egui::DragValue::new(&mut self.length).range(0..=max_loc));
-            // ui.spacing_mut().slider_width = ui.available_width();
-            // ui.add(egui::Slider::new(&mut self.offset, 0..=max_loc).show_value(false));
         });
     }
 
-    fn right_detail_panel(&mut self, ui: &mut egui::Ui) {
-        ui.label("right");
+    fn detail_panel(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label("图标：");
+            ui.add(egui::TextEdit::singleline(&mut self.midi_pattern.icon).char_limit(2));
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("名称：");
+            ui.add(egui::TextEdit::singleline(&mut self.midi_pattern.name));
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("长度：");
+            let min_beats = self.midi_pattern.min_beats();
+            ui.add(
+                egui::DragValue::new(&mut self.midi_pattern.beats)
+                    .range(min_beats..=(u64::MAX >> 2)),
+            );
+        });
     }
 }

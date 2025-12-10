@@ -12,6 +12,12 @@ impl LynId {
     }
 }
 
+impl From<LynId> for egui::Id {
+    fn from(value: LynId) -> Self {
+        Self::new(value)
+    }
+}
+
 impl std::hash::Hash for LynId {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         (ID_HASH_PREFIX, self.0).hash(state);

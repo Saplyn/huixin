@@ -1,9 +1,9 @@
-// MARK: Code to be audited for quality control
-
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use either::Either;
 use lyn_util::id::LynId;
+
+use crate::routines::metronome::TICK_PER_BEAT;
 
 use super::SheetPatternTrait;
 
@@ -16,6 +16,7 @@ pub struct MidiPattern {
     /// total ticks = beats / TICK_PER_BEAT
     pub beats: u64,
 
+    end_tick_map: BTreeMap<u64, u32>,
     notes: HashMap<u64, Vec<MidiNote>>,
 }
 
@@ -25,6 +26,7 @@ impl MidiPattern {
             name,
             icon: icon.unwrap_or(String::from("󰄛 ")),
             beats: 1,
+            end_tick_map: BTreeMap::new(),
             notes: HashMap::new(),
         }
     }
@@ -34,20 +36,47 @@ impl MidiPattern {
     }
     pub fn add_note(&mut self, note: MidiNote) {
         self.notes.entry(note.start).or_default().push(note);
+        self.end_tick_map
+            .entry(note.end_tick())
+            .and_modify(|count| *count += 1)
+            .or_insert(1);
     }
     pub fn del_note(&mut self, hint: Either<LynId, MidiNote>) {
         match hint {
             Either::Left(id) => {
                 self.notes.retain(|_, vec| {
-                    vec.retain(|n| n.id() != id);
-                    !vec.is_empty()
+                    let mut removed = false;
+                    let mut i = 0;
+                    while i < vec.len() {
+                        if vec[i].id() == id {
+                            if let Some(count) = self.end_tick_map.get_mut(&vec[i].end_tick()) {
+                                if *count > 1 {
+                                    *count -= 1;
+                                } else {
+                                    self.end_tick_map.remove(&vec[i].end_tick());
+                                }
+                            }
+                            vec.remove(i);
+                            removed = true;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                    !vec.is_empty() || !removed
                 });
             }
             Either::Right(note) => {
                 if let Some(vec) = self.notes.get_mut(&note.start)
                     && let Some(idx) = vec.iter().position(|n| n.id() == note.id())
                 {
-                    vec.remove(idx);
+                    let note = vec.remove(idx);
+                    if let Some(count) = self.end_tick_map.get_mut(&note.end_tick()) {
+                        if *count > 1 {
+                            *count -= 1;
+                        } else {
+                            self.end_tick_map.remove(&note.end_tick());
+                        }
+                    }
                     if vec.is_empty() {
                         self.notes.remove(&note.start);
                     }
@@ -61,7 +90,18 @@ impl MidiPattern {
                 let mut clean = None;
                 for (start, notes) in self.notes.iter_mut() {
                     if let Some(note) = notes.iter_mut().find(|n| n.id() == id) {
+                        if let Some(count) = self.end_tick_map.get_mut(&note.end_tick()) {
+                            if *count > 1 {
+                                *count -= 1;
+                            } else {
+                                self.end_tick_map.remove(&note.end_tick());
+                            }
+                        }
                         f(note);
+                        self.end_tick_map
+                            .entry(note.end_tick())
+                            .and_modify(|count| *count += 1)
+                            .or_insert(1);
                         if *start != note.start {
                             let moved_note = *note;
                             notes.retain(|n| n.id() != id);
@@ -84,8 +124,20 @@ impl MidiPattern {
                 if let Some(vec) = self.notes.get_mut(&old_note.start)
                     && let Some(idx) = vec.iter().position(|n| n.id() == old_note.id())
                 {
-                    f(&mut vec[idx]);
-                    if vec[idx].start != old_note.start {
+                    let note = &mut vec[idx];
+                    if let Some(count) = self.end_tick_map.get_mut(&note.end_tick()) {
+                        if *count > 1 {
+                            *count -= 1;
+                        } else {
+                            self.end_tick_map.remove(&note.end_tick());
+                        }
+                    }
+                    f(note);
+                    self.end_tick_map
+                        .entry(note.end_tick())
+                        .and_modify(|count| *count += 1)
+                        .or_insert(1);
+                    if note.start != old_note.start {
                         let moved_note = vec[idx];
                         vec.remove(idx);
                         if vec.is_empty() {
@@ -100,6 +152,13 @@ impl MidiPattern {
             }
         }
     }
+    pub fn min_beats(&self) -> u64 {
+        self.end_tick_map
+            .iter()
+            .next_back()
+            .map(|(max_end_tick, _)| max_end_tick.div_ceil(TICK_PER_BEAT))
+            .unwrap_or(1)
+    }
 }
 
 impl Default for MidiPattern {
@@ -108,6 +167,7 @@ impl Default for MidiPattern {
             name: String::new(),
             icon: String::from("󰄛 "),
             beats: 1,
+            end_tick_map: BTreeMap::new(),
             notes: HashMap::new(),
         }
     }
@@ -160,7 +220,12 @@ impl MidiNote {
             length,
         }
     }
+    #[inline]
     pub fn id(&self) -> LynId {
         self.id
+    }
+    #[inline]
+    pub fn end_tick(&self) -> u64 {
+        self.start + self.length
     }
 }

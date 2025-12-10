@@ -6,8 +6,8 @@ use super::constants::{
 #[derive(Debug)]
 pub struct MidiKeyboard;
 
-impl egui::Widget for MidiKeyboard {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+impl MidiKeyboard {
+    pub fn show(self, ui: &mut egui::Ui) {
         let desired_size = emath::vec2(KEY_ROW_WIDTH, NUMBER_OF_KEYS as f32 * KEY_ROW_HEIGHT);
         let (rect, resp) = ui.allocate_exact_size(desired_size, egui::Sense::all());
         if ui.is_rect_visible(rect) {
@@ -78,8 +78,6 @@ impl egui::Widget for MidiKeyboard {
                 );
             }
         }
-
-        resp
     }
 }
 

@@ -9,7 +9,11 @@ use dashmap::DashMap;
 use log::{debug, error, info};
 use parking_lot::{RwLock, RwLockWriteGuard};
 
-use crate::{app::MainAppCmd, routines::RoutineId};
+use crate::{
+    app::{MainAppCmd, MainState, PlayerContext},
+    routines::RoutineId,
+    sheet::pattern::SheetPatternTrait,
+};
 
 pub const TICK_PER_BEAT: u64 = 4;
 pub const SLEEP_PER_TICK: u32 = 50;
@@ -23,20 +27,22 @@ pub struct Metronome {
     playing: RwLock<bool>,
     bpm: RwLock<f64>,
     curr_tick: RwLock<u64>,
-    top_tick: RwLock<Option<u64>>,
 
     // api states
     tick_memory: DashMap<RoutineId, u64>,
+
+    // logic state
+    main_state: Arc<MainState>,
 }
 
 impl Metronome {
-    pub fn new() -> Self {
+    pub fn new(main_state: Arc<MainState>) -> Self {
         Self {
             playing: RwLock::new(false),
             bpm: RwLock::new(130.),
             curr_tick: RwLock::new(0),
-            top_tick: RwLock::new(None),
             tick_memory: DashMap::default(),
+            main_state,
         }
     }
 }
@@ -88,14 +94,13 @@ fn main(state: Arc<Metronome>) -> ! {
 
         // update tick
         {
-            let top_tick_guard = state.top_tick.read();
             let mut curr_tick_guard = state.curr_tick.write();
-            match *top_tick_guard {
+            match state.top_tick() {
                 Some(top_tick) if *curr_tick_guard >= top_tick => *curr_tick_guard = 0,
                 _ => *curr_tick_guard = curr_tick_guard.saturating_add(1),
             }
         }
-        debug!("{}/{:?}", state.curr_tick.read(), state.top_tick.read());
+        debug!("{}/{:?}", state.curr_tick.read(), state.top_tick());
     }
 }
 
@@ -125,14 +130,17 @@ impl Metronome {
         self.tick_memory.clear();
     }
 
-    /// Returns the top tick, if any.
+    /// Returns the top tick if current .
     pub fn top_tick(&self) -> Option<u64> {
-        *self.top_tick.read()
-    }
-
-    /// Sets the top tick.
-    pub fn set_top_tick(&self, tick: Option<u64>) {
-        *self.top_tick.write() = tick;
+        match self.main_state.player_context() {
+            PlayerContext::Track => None,
+            PlayerContext::Pattern => self
+                .main_state
+                .selected_pattern()
+                .as_ref()
+                .and_then(|ptr| ptr.upgrade())
+                .map(|pat| pat.read().beats() * TICK_PER_BEAT - 1),
+        }
     }
 
     /// Returns the BPM value.
