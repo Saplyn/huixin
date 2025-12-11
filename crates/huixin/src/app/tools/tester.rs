@@ -1,27 +1,27 @@
 use std::sync::Arc;
 
 use crate::{
-    app::{MainState, helpers::WidgetId, tools::ToolWindow},
+    app::{CommonState, helpers::WidgetId, tools::ToolWindow},
     routines::{metronome::Metronome, sheet_reader::SheetReader},
 };
 
 #[derive(Debug)]
 pub struct Tester {
     open: bool,
-    main_state: Arc<MainState>,
+    common: Arc<CommonState>,
     metronome: Arc<Metronome>,
     sheet_reader: Arc<SheetReader>,
 }
 
 impl Tester {
     pub fn new(
-        main_state: Arc<MainState>,
+        common: Arc<CommonState>,
         metronome: Arc<Metronome>,
         sheet_reader: Arc<SheetReader>,
     ) -> Self {
         Self {
             open: false,
-            main_state,
+            common,
             metronome,
             sheet_reader,
         }
@@ -99,13 +99,13 @@ impl Tester {
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.code(format!(
                 "*selected_pattern: {:#?}",
-                self.main_state
+                self.common
                     .selected_pattern
                     .read()
                     .as_ref()
                     .and_then(|ptr| ptr.upgrade())
             ));
-            ui.code(format!("{:#?}", self.main_state));
+            ui.code(format!("{:#?}", self.common));
             ui.separator();
             ui.code(format!("{:#?}", self.sheet_reader));
             ui.separator();

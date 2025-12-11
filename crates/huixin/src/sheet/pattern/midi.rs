@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashMap};
 use either::Either;
 use lyn_util::id::LynId;
 
-use crate::routines::metronome::TICK_PER_BEAT;
+use crate::{routines::metronome::TICK_PER_BEAT, sheet::SheetMessage};
 
 use super::SheetPatternTrait;
 
@@ -174,28 +174,46 @@ impl Default for MidiPattern {
 }
 
 impl SheetPatternTrait for MidiPattern {
+    #[inline]
     fn name_ref(&self) -> &String {
         &self.name
     }
+    #[inline]
     fn name_mut(&mut self) -> &mut String {
         &mut self.name
     }
+    #[inline]
     fn set_name(&mut self, name: String) {
         self.name = name;
     }
 
+    #[inline]
     fn icon_ref(&self) -> &String {
         &self.icon
     }
+    #[inline]
     fn icon_mut(&mut self) -> &mut String {
         &mut self.icon
     }
+    #[inline]
     fn set_icon(&mut self, icon: String) {
         self.icon = icon;
     }
 
+    #[inline]
     fn beats(&self) -> u64 {
         self.beats
+    }
+    #[inline]
+    fn msg_at(&self, tick: u64) -> Vec<SheetMessage> {
+        self.notes.get(&tick).map_or_else(Vec::new, |notes| {
+            notes
+                .iter()
+                .map(|note| SheetMessage {
+                    tmp: format!("{:?}", note),
+                })
+                .collect()
+        })
     }
 }
 

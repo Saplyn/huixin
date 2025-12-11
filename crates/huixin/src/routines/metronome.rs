@@ -10,7 +10,7 @@ use log::{debug, error, info};
 use parking_lot::{RwLock, RwLockWriteGuard};
 
 use crate::{
-    app::{MainAppCmd, MainState, PlayerContext},
+    app::{CommonState, MainAppCmd, PlayerContext},
     routines::RoutineId,
     sheet::pattern::SheetPatternTrait,
 };
@@ -30,19 +30,15 @@ pub struct Metronome {
 
     // api states
     tick_memory: DashMap<RoutineId, u64>,
-
-    // logic state
-    main_state: Arc<MainState>,
 }
 
 impl Metronome {
-    pub fn new(main_state: Arc<MainState>) -> Self {
+    pub fn init() -> Self {
         Self {
             playing: RwLock::new(false),
             bpm: RwLock::new(130.),
             curr_tick: RwLock::new(0),
             tick_memory: DashMap::default(),
-            main_state,
         }
     }
 }
@@ -50,8 +46,8 @@ impl Metronome {
 // LYN: Metronome Main Routine
 
 impl Metronome {
-    pub fn main(state: Arc<Metronome>, cmd_tx: mpsc::Sender<MainAppCmd>) {
-        thread::spawn(|| main(state)).join().unwrap_err();
+    pub fn main(state: Arc<Self>, common: Arc<CommonState>, cmd_tx: mpsc::Sender<MainAppCmd>) {
+        thread::spawn(|| main(state, common)).join().unwrap_err();
         error!("Metronome panicked");
         cmd_tx
             .send(MainAppCmd::ShowError(
@@ -61,7 +57,7 @@ impl Metronome {
     }
 }
 
-fn main(state: Arc<Metronome>) -> ! {
+fn main(state: Arc<Metronome>, common: Arc<CommonState>) -> ! {
     info!("Metronome started");
     let (mut interval, mut sleep_time) = bpm_to_tickable(*state.bpm.read());
     let mut remaining = interval;
@@ -95,12 +91,12 @@ fn main(state: Arc<Metronome>) -> ! {
         // update tick
         {
             let mut curr_tick_guard = state.curr_tick.write();
-            match state.top_tick() {
+            match common.metro_tick_limit() {
                 Some(top_tick) if *curr_tick_guard >= top_tick => *curr_tick_guard = 0,
                 _ => *curr_tick_guard = curr_tick_guard.saturating_add(1),
             }
+            // debug!("{}/{:?}", state.curr_tick.read(), limit);
         }
-        debug!("{}/{:?}", state.curr_tick.read(), state.top_tick());
     }
 }
 
@@ -128,19 +124,6 @@ impl Metronome {
         *self.playing.write() = false;
         *self.curr_tick.write() = 0;
         self.tick_memory.clear();
-    }
-
-    /// Returns the top tick if current .
-    pub fn top_tick(&self) -> Option<u64> {
-        match self.main_state.player_context() {
-            PlayerContext::Track => None,
-            PlayerContext::Pattern => self
-                .main_state
-                .selected_pattern()
-                .as_ref()
-                .and_then(|ptr| ptr.upgrade())
-                .map(|pat| pat.read().beats() * TICK_PER_BEAT - 1),
-        }
     }
 
     /// Returns the BPM value.

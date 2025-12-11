@@ -4,7 +4,7 @@ use std::{
     thread,
 };
 
-use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use parking_lot::RwLock;
 
 use crate::{
     app::{
@@ -13,6 +13,7 @@ use crate::{
         widgets::{error_modal::ErrorModal, performance::Performance},
     },
     routines::{
+        instructor::Instructor,
         metronome::{Metronome, TICK_PER_BEAT},
         sheet_reader::SheetReader,
     },
@@ -31,31 +32,42 @@ mod widgets;
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum PlayerContext {
     #[default]
-    Track,
+    Sheet,
     Pattern,
 }
 
 #[derive(Debug)]
-pub struct MainState {
+pub struct CommonState {
     selected_pattern: RwLock<Option<Weak<RwLock<SheetPattern>>>>,
     player_context: RwLock<PlayerContext>,
 }
 
-impl MainState {
-    pub fn selected_pattern(&self) -> RwLockReadGuard<'_, Option<Weak<RwLock<SheetPattern>>>> {
-        self.selected_pattern.read()
-    }
-    pub fn selected_pattern_mut(&self) -> RwLockWriteGuard<'_, Option<Weak<RwLock<SheetPattern>>>> {
-        self.selected_pattern.write()
+impl CommonState {
+    pub fn selected_pattern(&self) -> Option<Arc<RwLock<SheetPattern>>> {
+        self.selected_pattern.read().clone()?.upgrade()
     }
     pub fn select_pattern(&self, pattern: Option<Weak<RwLock<SheetPattern>>>) {
         *self.selected_pattern.write() = pattern;
     }
+
     pub fn set_context(&self, context: PlayerContext) {
         *self.player_context.write() = context;
     }
     pub fn player_context(&self) -> PlayerContext {
         *self.player_context.read()
+    }
+
+    /// Returns the tick limit for metronome.
+    pub fn metro_tick_limit(&self) -> Option<u64> {
+        match *self.player_context.read() {
+            PlayerContext::Sheet => None,
+            PlayerContext::Pattern => self
+                .selected_pattern
+                .read()
+                .as_ref()
+                .and_then(|ptr| ptr.upgrade())
+                .map(|pat| pat.read().beats() * TICK_PER_BEAT - 1),
+        }
     }
 }
 
@@ -71,30 +83,32 @@ pub struct MainApp {
     pub tools: Vec<Box<dyn ToolWindow>>,
 
     // routine states
-    pub main_state: Arc<MainState>,
-    pub metronome: Arc<Metronome>,
-    pub sheet_reader: Arc<SheetReader>,
+    common: Arc<CommonState>,
+    metronome: Arc<Metronome>,
+    sheet_reader: Arc<SheetReader>,
+    instructor: Arc<Instructor>,
 }
 
 impl MainApp {
     pub fn prepare() -> Self {
         let (cmd_tx, cmd_rx) = mpsc::channel();
 
-        let main_state = Arc::new(MainState {
+        let common = Arc::new(CommonState {
             selected_pattern: RwLock::new(None),
-            player_context: RwLock::new(PlayerContext::Track),
+            player_context: RwLock::new(PlayerContext::Sheet),
         });
-        let metronome = Arc::new(Metronome::new(main_state.clone()));
-        let sheet_reader = Arc::new(SheetReader::new(main_state.clone()));
+        let metronome = Arc::new(Metronome::init());
+        let sheet_reader = Arc::new(SheetReader::init());
+        let instructor = Arc::new(Instructor::init());
 
         let tools: Vec<Box<dyn ToolWindow>> = vec![
             Box::new(Tester::new(
-                main_state.clone(),
+                common.clone(),
                 metronome.clone(),
                 sheet_reader.clone(),
             )),
             Box::new(PatternEditor::new(
-                main_state.clone(),
+                common.clone(),
                 metronome.clone(),
                 sheet_reader.clone(),
             )),
@@ -115,17 +129,25 @@ impl MainApp {
 
             SheetPattern::Midi(pat)
         };
+        // ===
 
         thread::spawn({
             let state = metronome.clone();
+            let common = common.clone();
             let cmd_tx = cmd_tx.clone();
-            move || Metronome::main(state, cmd_tx)
+            move || Metronome::main(state, common, cmd_tx)
         });
         thread::spawn({
             let state = sheet_reader.clone();
+            let common = common.clone();
             let metro = metronome.clone();
             let cmd_tx = cmd_tx.clone();
-            move || SheetReader::main(state, metro, cmd_tx)
+            move || SheetReader::main(state, common, metro, cmd_tx)
+        });
+        thread::spawn({
+            let state = instructor.clone();
+            let cmd_tx = cmd_tx.clone();
+            move || Instructor::main(state, cmd_tx)
         });
 
         Self {
@@ -134,9 +156,10 @@ impl MainApp {
             performance: Default::default(),
             error_modal: Default::default(),
             tools,
-            main_state,
+            common,
             metronome,
             sheet_reader,
+            instructor,
         }
     }
 }
@@ -174,14 +197,9 @@ impl eframe::App for MainApp {
 
         self.handle_ui_cmd();
 
-        if self
-            .main_state
-            .selected_pattern()
-            .as_ref()
-            .is_some_and(|ptr| ptr.upgrade().is_none())
-        {
-            self.main_state.select_pattern(None);
-            self.main_state.set_context(PlayerContext::Track);
+        if self.common.selected_pattern().is_none() {
+            self.common.select_pattern(None);
+            self.common.set_context(PlayerContext::Sheet);
         }
 
         self.draw_ui(ctx);
@@ -244,7 +262,7 @@ impl MainApp {
             if ui
                 .add(
                     egui::Button::new("󰲸 ")
-                        .selected(self.main_state.player_context() == PlayerContext::Track)
+                        .selected(self.common.player_context() == PlayerContext::Sheet)
                         .corner_radius(egui::CornerRadius {
                             ne: 0,
                             se: 0,
@@ -254,11 +272,11 @@ impl MainApp {
                 )
                 .clicked()
             {
-                self.main_state.set_context(PlayerContext::Track);
+                self.common.set_context(PlayerContext::Sheet);
             }
 
             {
-                let selected_pattern = self.main_state.selected_pattern();
+                let selected_pattern = self.common.selected_pattern();
 
                 if ui
                     .add_enabled(
@@ -266,11 +284,7 @@ impl MainApp {
                         egui::Button::new(format!(
                             "󰎅  {}",
                             selected_pattern
-                                .as_ref()
-                                .map(|ptr| ptr
-                                    .upgrade()
-                                    .map(|pat| pat.read().name_ref().to_owned())
-                                    .unwrap_or_default())
+                                .map(|pat| pat.read().name_ref().to_owned())
                                 .unwrap_or_default()
                         ))
                         .corner_radius(egui::CornerRadius {
@@ -278,12 +292,12 @@ impl MainApp {
                             sw: 0,
                             ..ui.style().noninteractive().corner_radius
                         })
-                        .selected(self.main_state.player_context() == PlayerContext::Pattern)
+                        .selected(self.common.player_context() == PlayerContext::Pattern)
                         .frame_when_inactive(true),
                     )
                     .clicked()
                 {
-                    self.main_state.set_context(PlayerContext::Pattern);
+                    self.common.set_context(PlayerContext::Pattern);
                 }
             }
         });
@@ -320,7 +334,7 @@ impl MainApp {
         ui.label(format!(
             " {}/{:?}",
             self.metronome.query_tick(),
-            self.metronome.top_tick()
+            self.common.metro_tick_limit()
         ));
     }
 
@@ -349,21 +363,16 @@ impl MainApp {
                         pattern.read().name_ref()
                     ))
                     .selected(
-                        self.main_state
+                        self.common
                             .selected_pattern()
-                            .as_ref()
-                            .is_some_and(|ptr| {
-                                ptr.upgrade().is_some_and(|pat| {
-                                    pat.read().name_ref() == pattern.read().name_ref()
-                                })
-                            }),
+                            .is_some_and(|pat| pat.read().name_ref() == pattern.read().name_ref()),
                     )
                     .frame_when_inactive(true),
                 )
                 .clicked()
             {
                 let pat_ptr = Arc::downgrade(pattern);
-                self.main_state.select_pattern(Some(pat_ptr.clone()));
+                self.common.select_pattern(Some(pat_ptr.clone()));
             };
         }
     }

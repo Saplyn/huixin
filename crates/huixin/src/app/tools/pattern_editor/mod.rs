@@ -2,7 +2,7 @@ use std::{ops::DerefMut, sync::Arc};
 
 use crate::{
     app::{
-        MainState,
+        CommonState,
         helpers::WidgetId,
         tools::{
             ToolWindow,
@@ -24,21 +24,21 @@ pub struct PatternEditor {
     midi_editor_state: MidiEditorState,
 
     // logic states
-    main_state: Arc<MainState>,
+    common: Arc<CommonState>,
     metronome: Arc<Metronome>,
     sheet_reader: Arc<SheetReader>,
 }
 
 impl PatternEditor {
     pub fn new(
-        main_state: Arc<MainState>,
+        common: Arc<CommonState>,
         metronome: Arc<Metronome>,
         sheet_reader: Arc<SheetReader>,
     ) -> Self {
         Self {
             open: true,
             midi_editor_state: MidiEditorState::default(),
-            main_state,
+            common,
             metronome,
             sheet_reader,
         }
@@ -68,7 +68,7 @@ impl ToolWindow for PatternEditor {
 
     fn draw(&mut self, ctx: &egui::Context) {
         let mut open = self.open;
-        egui::Window::new("Pattern Editor")
+        egui::Window::new("片段编辑器")
             .id(WidgetId::PatternEditor.into())
             .frame(egui::Frame::window(&ctx.style()).inner_margin(0))
             .collapsible(false)
@@ -76,8 +76,7 @@ impl ToolWindow for PatternEditor {
             .min_size(emath::vec2(300., 150.))
             .default_size(emath::vec2(400., 300.))
             .show(ctx, |ui| {
-                let pat_guard = self.main_state.selected_pattern_mut();
-                let Some(pat) = pat_guard.as_ref() else {
+                let Some(pat) = self.common.selected_pattern() else {
                     ui.disable();
                     ui.with_layout(
                         egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
@@ -88,14 +87,9 @@ impl ToolWindow for PatternEditor {
                     return;
                 };
 
-                let pat_guard = pat.upgrade();
-                let Some(mut pat) = pat_guard.as_deref().map(|pat| pat.write()) else {
-                    return;
-                };
-                match pat.deref_mut() {
+                match pat.write().deref_mut() {
                     SheetPattern::Midi(pat) => {
-                        let output =
-                            MidiEditor::new(&mut self.midi_editor_state, pat).show_inside(ui);
+                        MidiEditor::new(&mut self.midi_editor_state, pat).show_inside(ui)
                     }
                 };
             });

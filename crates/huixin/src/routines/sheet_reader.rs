@@ -1,15 +1,15 @@
 use std::{
-    sync::{Arc, Weak, mpsc},
+    sync::{Arc, mpsc},
     thread,
     time::Duration,
 };
 
 use dashmap::DashSet;
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
-    app::{MainAppCmd, MainState},
+    app::{CommonState, MainAppCmd, PlayerContext},
     routines::{RoutineId, metronome::Metronome},
     sheet::{
         SheetTrack,
@@ -19,6 +19,8 @@ use crate::{
 
 const REQUEST_TICK_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
+// LYN: Sheet Reader State Holder
+
 #[derive(Debug)]
 pub struct SheetReader {
     // core state
@@ -27,18 +29,14 @@ pub struct SheetReader {
 
     // api state
     pattern_names: DashSet<String>,
-
-    // logic state
-    main_state: Arc<MainState>,
 }
 
 impl SheetReader {
-    pub fn new(main_state: Arc<MainState>) -> Self {
+    pub fn init() -> Self {
         Self {
             patterns: Default::default(),
             tracks: RwLock::new(Vec::new()),
             pattern_names: DashSet::default(),
-            main_state,
         }
     }
 }
@@ -46,8 +44,15 @@ impl SheetReader {
 // LYN: Sheet Reader Main Routine
 
 impl SheetReader {
-    pub fn main(state: Arc<SheetReader>, metro: Arc<Metronome>, cmd_tx: mpsc::Sender<MainAppCmd>) {
-        thread::spawn(|| main(state, metro)).join().unwrap_err();
+    pub fn main(
+        state: Arc<Self>,
+        common: Arc<CommonState>,
+        metro: Arc<Metronome>,
+        cmd_tx: mpsc::Sender<MainAppCmd>,
+    ) {
+        thread::spawn(|| main(state, common, metro))
+            .join()
+            .unwrap_err();
         error!("Sheet-reader panicked");
         cmd_tx
             .send(MainAppCmd::ShowError(
@@ -57,7 +62,7 @@ impl SheetReader {
     }
 }
 
-fn main(state: Arc<SheetReader>, metro: Arc<Metronome>) {
+fn main(state: Arc<SheetReader>, common: Arc<CommonState>, metro: Arc<Metronome>) {
     info!("Sheet-reader started");
 
     loop {
@@ -66,7 +71,15 @@ fn main(state: Arc<SheetReader>, metro: Arc<Metronome>) {
             continue;
         };
 
-        debug!("{tick}");
+        match common.player_context() {
+            PlayerContext::Sheet => todo!(),
+            PlayerContext::Pattern => {
+                let Some(pat) = common.selected_pattern() else {
+                    continue;
+                };
+                info!("{:?}", pat.read().msg_at(tick));
+            }
+        };
     }
 }
 
