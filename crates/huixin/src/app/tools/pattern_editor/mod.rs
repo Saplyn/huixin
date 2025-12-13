@@ -9,13 +9,11 @@ use crate::{
             pattern_editor::midi_editor::{MidiEditor, MidiEditorState},
         },
     },
-    routines::{metronome::Metronome, sheet_reader::SheetReader},
-    sheet::pattern::SheetPattern,
+    model::pattern::SheetPattern,
+    routines::{instructor::Instructor, metronome::Metronome, sheet_reader::SheetReader},
 };
 
 mod midi_editor;
-
-// LYN: Pattern Editor Main Interface
 
 #[derive(Debug)]
 pub struct PatternEditor {
@@ -27,6 +25,7 @@ pub struct PatternEditor {
     common: Arc<CommonState>,
     metronome: Arc<Metronome>,
     sheet_reader: Arc<SheetReader>,
+    instructor: Arc<Instructor>,
 }
 
 impl PatternEditor {
@@ -34,13 +33,15 @@ impl PatternEditor {
         common: Arc<CommonState>,
         metronome: Arc<Metronome>,
         sheet_reader: Arc<SheetReader>,
+        instructor: Arc<Instructor>,
     ) -> Self {
         Self {
-            open: true,
+            open: false,
             midi_editor_state: MidiEditorState::default(),
             common,
             metronome,
             sheet_reader,
+            instructor,
         }
     }
 }
@@ -68,9 +69,9 @@ impl ToolWindow for PatternEditor {
 
     fn draw(&mut self, ctx: &egui::Context) {
         let mut open = self.open;
-        egui::Window::new("片段编辑器")
+        egui::Window::new("片段编辑")
             .id(WidgetId::PatternEditor.into())
-            .frame(egui::Frame::window(&ctx.style()).inner_margin(0))
+            .frame(egui::Frame::window(&ctx.style()).inner_margin(egui::Margin::ZERO))
             .collapsible(false)
             .open(&mut open)
             .min_size(emath::vec2(300., 150.))
@@ -89,7 +90,8 @@ impl ToolWindow for PatternEditor {
 
                 match pat.write().deref_mut() {
                     SheetPattern::Midi(pat) => {
-                        MidiEditor::new(&mut self.midi_editor_state, pat).show_inside(ui)
+                        MidiEditor::new(&mut self.midi_editor_state, pat, self.instructor.targets())
+                            .show_inside(ui)
                     }
                 };
             });

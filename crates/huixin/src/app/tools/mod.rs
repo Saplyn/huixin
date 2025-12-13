@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+pub mod connection_manager;
 pub mod pattern_editor;
 pub mod tester;
 

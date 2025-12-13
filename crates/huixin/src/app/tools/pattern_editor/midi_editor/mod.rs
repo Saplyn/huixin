@@ -1,6 +1,14 @@
+use std::sync::Arc;
+
+use dashmap::DashMap;
+use lyn_util::egui::LynId;
+use parking_lot::RwLock;
+
 use self::{midi_keyboard::MidiKeyboard, midi_note::MidiNoteWidget, midi_rows::MidiRows};
 use crate::{
-    app::helpers::WidgetId, routines::metronome::TICK_PER_BEAT, sheet::pattern::midi::MidiPattern,
+    app::helpers::WidgetId,
+    model::{CommTarget, pattern::midi::MidiPattern},
+    routines::metronome::TICK_PER_BEAT,
 };
 
 pub mod constants;
@@ -29,21 +37,27 @@ impl Default for MidiEditorState {
 // LYN: Midi Editor State
 
 #[derive(Debug)]
-pub struct MidiEditor<'pat, 'state> {
+pub struct MidiEditor<'pat, 'state, 'targets> {
     state: &'state mut MidiEditorState,
     midi_pattern: &'pat mut MidiPattern,
+    targets: &'targets DashMap<LynId, Arc<RwLock<CommTarget>>>,
 }
 
-impl<'pat, 'state> MidiEditor<'pat, 'state> {
-    pub fn new(state: &'state mut MidiEditorState, midi_pattern: &'pat mut MidiPattern) -> Self {
+impl<'pat, 'state, 'targets> MidiEditor<'pat, 'state, 'targets> {
+    pub fn new(
+        state: &'state mut MidiEditorState,
+        midi_pattern: &'pat mut MidiPattern,
+        targets: &'targets DashMap<LynId, Arc<RwLock<CommTarget>>>,
+    ) -> Self {
         Self {
             state,
             midi_pattern,
+            targets,
         }
     }
 }
 
-impl<'pat, 'state> MidiEditor<'pat, 'state> {
+impl<'pat, 'state, 'targets> MidiEditor<'pat, 'state, 'targets> {
     pub fn show_inside(mut self, ui: &mut egui::Ui) {
         egui::SidePanel::right(WidgetId::PatternEditorMidiDetailPanel)
             .resizable(false)
@@ -84,7 +98,7 @@ impl<'pat, 'state> MidiEditor<'pat, 'state> {
     }
 }
 
-impl<'pat, 'state> MidiEditor<'pat, 'state> {
+impl<'pat, 'state, 'targets> MidiEditor<'pat, 'state, 'targets> {
     fn util_bar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("util bar");
@@ -109,6 +123,39 @@ impl<'pat, 'state> MidiEditor<'pat, 'state> {
                 egui::DragValue::new(&mut self.midi_pattern.beats)
                     .range(min_beats..=(u64::MAX >> 2)),
             );
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("标识：");
+            ui.add(egui::TextEdit::singleline(&mut self.midi_pattern.tag));
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("目标：");
+
+            let target_name = self
+                .midi_pattern
+                .target_id
+                .and_then(|id| {
+                    let ret = self.targets.get(&id);
+                    if ret.is_none() {
+                        self.midi_pattern.target_id = None;
+                    }
+                    ret
+                })
+                .map(|target| target.read().name.clone());
+            egui::ComboBox::from_label("target")
+                .selected_text(target_name.unwrap_or("None".to_string()))
+                .show_ui(ui, |ui| {
+                    let target_id_mut = &mut self.midi_pattern.target_id;
+                    for entry in self.targets.iter() {
+                        ui.selectable_value(
+                            target_id_mut,
+                            Some(*entry.key()),
+                            &entry.value().read().name,
+                        );
+                    }
+                })
         });
     }
 }

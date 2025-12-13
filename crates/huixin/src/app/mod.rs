@@ -9,17 +9,22 @@ use parking_lot::RwLock;
 use crate::{
     app::{
         helpers::WidgetId,
-        tools::{ToolWindow, pattern_editor::PatternEditor, tester::Tester},
+        tools::{
+            ToolWindow, connection_manager::ConnectionManager, pattern_editor::PatternEditor,
+            tester::Tester,
+        },
         widgets::{error_modal::ErrorModal, performance::Performance},
     },
+    model::pattern::{
+        SheetPattern, SheetPatternTrait, SheetPatternType,
+        midi::{MidiNote, MidiPattern},
+    },
     routines::{
+        RoutineId,
+        guardian::Guardian,
         instructor::Instructor,
         metronome::{Metronome, TICK_PER_BEAT},
         sheet_reader::SheetReader,
-    },
-    sheet::pattern::{
-        SheetPattern, SheetPatternTrait, SheetPatternType,
-        midi::{MidiNote, MidiPattern},
     },
 };
 
@@ -65,7 +70,7 @@ impl CommonState {
                 .selected_pattern
                 .read()
                 .as_ref()
-                .and_then(|ptr| ptr.upgrade())
+                .and_then(|weak| weak.upgrade())
                 .map(|pat| pat.read().beats() * TICK_PER_BEAT - 1),
         }
     }
@@ -92,6 +97,7 @@ pub struct MainApp {
 impl MainApp {
     pub fn prepare() -> Self {
         let (cmd_tx, cmd_rx) = mpsc::channel();
+        let (msg_tx, msg_rx) = mpsc::channel();
 
         let common = Arc::new(CommonState {
             selected_pattern: RwLock::new(None),
@@ -111,7 +117,9 @@ impl MainApp {
                 common.clone(),
                 metronome.clone(),
                 sheet_reader.clone(),
+                instructor.clone(),
             )),
+            Box::new(ConnectionManager::new(common.clone(), instructor.clone())),
         ];
 
         // FIXME: test data
@@ -131,23 +139,35 @@ impl MainApp {
         };
         // ===
 
+        let routines = vec![
+            (
+                RoutineId::Metronome,
+                thread::spawn({
+                    let state = metronome.clone();
+                    let common = common.clone();
+                    move || Metronome::main(state, common)
+                }),
+            ),
+            (
+                RoutineId::SheetReader,
+                thread::spawn({
+                    let state = sheet_reader.clone();
+                    let common = common.clone();
+                    let metro = metronome.clone();
+                    move || SheetReader::main(state, common, metro, msg_tx)
+                }),
+            ),
+            (
+                RoutineId::Instructor,
+                thread::spawn({
+                    let state = instructor.clone();
+                    move || Instructor::main(state, msg_rx)
+                }),
+            ),
+        ];
         thread::spawn({
-            let state = metronome.clone();
-            let common = common.clone();
             let cmd_tx = cmd_tx.clone();
-            move || Metronome::main(state, common, cmd_tx)
-        });
-        thread::spawn({
-            let state = sheet_reader.clone();
-            let common = common.clone();
-            let metro = metronome.clone();
-            let cmd_tx = cmd_tx.clone();
-            move || SheetReader::main(state, common, metro, cmd_tx)
-        });
-        thread::spawn({
-            let state = instructor.clone();
-            let cmd_tx = cmd_tx.clone();
-            move || Instructor::main(state, cmd_tx)
+            move || Guardian::main(routines, cmd_tx)
         });
 
         Self {
@@ -371,8 +391,7 @@ impl MainApp {
                 )
                 .clicked()
             {
-                let pat_ptr = Arc::downgrade(pattern);
-                self.common.select_pattern(Some(pat_ptr.clone()));
+                self.common.select_pattern(Some(Arc::downgrade(pattern)));
             };
         }
     }

@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
 
 use either::Either;
-use lyn_util::id::LynId;
+use lyn_util::{comm::Instruction, egui::LynId};
 
-use crate::{routines::metronome::TICK_PER_BEAT, sheet::SheetMessage};
+use crate::{model::SheetMessage, routines::metronome::TICK_PER_BEAT};
 
 use super::SheetPatternTrait;
 
@@ -11,13 +11,19 @@ use super::SheetPatternTrait;
 
 #[derive(Debug)]
 pub struct MidiPattern {
+    // pattern
     pub name: String,
     pub icon: String,
     /// total ticks = beats / TICK_PER_BEAT
     pub beats: u64,
 
+    // pattern internal
     end_tick_map: BTreeMap<u64, u32>,
     notes: HashMap<u64, Vec<MidiNote>>,
+
+    // communication
+    pub tag: String,
+    pub target_id: Option<LynId>,
 }
 
 impl MidiPattern {
@@ -28,6 +34,8 @@ impl MidiPattern {
             beats: 1,
             end_tick_map: BTreeMap::new(),
             notes: HashMap::new(),
+            tag: String::new(),
+            target_id: None,
         }
     }
 
@@ -152,6 +160,7 @@ impl MidiPattern {
             }
         }
     }
+    #[inline]
     pub fn min_beats(&self) -> u64 {
         self.end_tick_map
             .iter()
@@ -169,6 +178,8 @@ impl Default for MidiPattern {
             beats: 1,
             end_tick_map: BTreeMap::new(),
             notes: HashMap::new(),
+            tag: String::new(),
+            target_id: None,
         }
     }
 }
@@ -204,13 +215,21 @@ impl SheetPatternTrait for MidiPattern {
     fn beats(&self) -> u64 {
         self.beats
     }
+
     #[inline]
     fn msg_at(&self, tick: u64) -> Vec<SheetMessage> {
+        let Some(target_id) = self.target_id else {
+            return Vec::new();
+        };
         self.notes.get(&tick).map_or_else(Vec::new, |notes| {
             notes
                 .iter()
                 .map(|note| SheetMessage {
-                    tmp: format!("{:?}", note),
+                    target_id,
+                    payload: Instruction {
+                        tag: self.tag.clone(),
+                        data: note.form_data(),
+                    },
                 })
                 .collect()
         })
@@ -245,5 +264,13 @@ impl MidiNote {
     #[inline]
     pub fn end_tick(&self) -> u64 {
         self.start + self.length
+    }
+    #[inline]
+    pub fn form_data(&self) -> ron::Map {
+        let mut map = ron::Map::new();
+        map.insert("midicode", self.midicode);
+        map.insert("strength", self.strength);
+        map.insert("length", self.length);
+        map
     }
 }

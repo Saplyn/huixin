@@ -1,9 +1,9 @@
 use crate::{
-    routines::metronome::TICK_PER_BEAT,
-    sheet::pattern::{
+    model::pattern::{
         SheetPatternTrait,
         midi::{MidiNote, MidiPattern},
     },
+    routines::metronome::TICK_PER_BEAT,
 };
 
 use super::constants::{KEY_ROW_HEIGHT, NUMBER_OF_KEYS};

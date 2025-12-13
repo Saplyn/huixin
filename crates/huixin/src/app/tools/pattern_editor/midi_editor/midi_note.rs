@@ -2,8 +2,8 @@ use either::Either;
 
 use super::constants::KEY_ROW_HEIGHT;
 use crate::{
+    model::pattern::midi::{MidiNote, MidiPattern},
     routines::metronome::TICK_PER_BEAT,
-    sheet::pattern::midi::{MidiNote, MidiPattern},
 };
 
 pub const RESIZE_HANDLE_WIDTH: f32 = 6.;

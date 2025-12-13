@@ -1,4 +1,4 @@
-use crate::sheet::SheetMessage;
+use crate::model::SheetMessage;
 
 use self::midi::MidiPattern;
 

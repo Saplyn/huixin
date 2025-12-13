@@ -20,7 +20,11 @@ log = { workspace = true }
 simplelog = { workspace = true }
 # Concurrency
 parking_lot = "0.12"
-dashmap = "7.0.0-rc2"
+dashmap = { version = "7.0.0-rc2" }
+rayon = "1.11"
+# Communication
+serde = { workspace = true }
+ron = { workspace = true }
 # Misc
 either = "1.15"
 lyn-util = { workspace = true }

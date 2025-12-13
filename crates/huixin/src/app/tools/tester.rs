@@ -103,7 +103,7 @@ impl Tester {
                     .selected_pattern
                     .read()
                     .as_ref()
-                    .and_then(|ptr| ptr.upgrade())
+                    .and_then(|weak| weak.upgrade())
             ));
             ui.code(format!("{:#?}", self.common));
             ui.separator();

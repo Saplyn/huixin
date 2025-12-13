@@ -5,16 +5,17 @@ use std::{
 };
 
 use dashmap::DashSet;
-use log::{error, info, warn};
+use log::{info, warn};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
-    app::{CommonState, MainAppCmd, PlayerContext},
-    routines::{RoutineId, metronome::Metronome},
-    sheet::{
-        SheetTrack,
+    app::{CommonState, PlayerContext},
+    model::{
+        SheetMessage,
         pattern::{SheetPattern, SheetPatternTrait, SheetPatternType, midi::MidiPattern},
+        track::SheetTrack,
     },
+    routines::{RoutineId, metronome::Metronome},
 };
 
 const REQUEST_TICK_POLL_INTERVAL: Duration = Duration::from_millis(50);
@@ -23,15 +24,13 @@ const REQUEST_TICK_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 #[derive(Debug)]
 pub struct SheetReader {
-    // core state
     patterns: RwLock<Vec<Arc<RwLock<SheetPattern>>>>,
     tracks: RwLock<Vec<RwLock<SheetTrack>>>,
-
-    // api state
     pattern_names: DashSet<String>,
 }
 
 impl SheetReader {
+    #[inline]
     pub fn init() -> Self {
         Self {
             patterns: Default::default(),
@@ -39,30 +38,25 @@ impl SheetReader {
             pattern_names: DashSet::default(),
         }
     }
-}
-
-// LYN: Sheet Reader Main Routine
-
-impl SheetReader {
+    #[inline]
     pub fn main(
         state: Arc<Self>,
         common: Arc<CommonState>,
         metro: Arc<Metronome>,
-        cmd_tx: mpsc::Sender<MainAppCmd>,
-    ) {
-        thread::spawn(|| main(state, common, metro))
-            .join()
-            .unwrap_err();
-        error!("Sheet-reader panicked");
-        cmd_tx
-            .send(MainAppCmd::ShowError(
-                "Sheet-reader thread unexpectedly panicked".to_string(),
-            ))
-            .expect("Failed to request error to be displayed on UI");
+        msg_tx: mpsc::Sender<SheetMessage>,
+    ) -> ! {
+        main(state, common, metro, msg_tx)
     }
 }
 
-fn main(state: Arc<SheetReader>, common: Arc<CommonState>, metro: Arc<Metronome>) {
+// LYN: Sheet Reader Main Routine
+
+fn main(
+    state: Arc<SheetReader>,
+    common: Arc<CommonState>,
+    metro: Arc<Metronome>,
+    msg_tx: mpsc::Sender<SheetMessage>,
+) -> ! {
     info!("Sheet-reader started");
 
     loop {
@@ -77,7 +71,11 @@ fn main(state: Arc<SheetReader>, common: Arc<CommonState>, metro: Arc<Metronome>
                 let Some(pat) = common.selected_pattern() else {
                     continue;
                 };
-                info!("{:?}", pat.read().msg_at(tick));
+                for msg in pat.read().msg_at(tick) {
+                    msg_tx
+                        .send(msg)
+                        .expect("Instruction messaging channel unexpectedly closed");
+                }
             }
         };
     }

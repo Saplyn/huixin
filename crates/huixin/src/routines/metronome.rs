@@ -1,19 +1,10 @@
-use std::{
-    cmp,
-    sync::{Arc, mpsc},
-    thread,
-    time::Duration,
-};
+use std::{cmp, sync::Arc, thread, time::Duration};
 
 use dashmap::DashMap;
-use log::{debug, error, info};
+use log::{info, trace};
 use parking_lot::{RwLock, RwLockWriteGuard};
 
-use crate::{
-    app::{CommonState, MainAppCmd, PlayerContext},
-    routines::RoutineId,
-    sheet::pattern::SheetPatternTrait,
-};
+use crate::{app::CommonState, routines::RoutineId};
 
 pub const TICK_PER_BEAT: u64 = 4;
 pub const SLEEP_PER_TICK: u32 = 50;
@@ -33,6 +24,7 @@ pub struct Metronome {
 }
 
 impl Metronome {
+    #[inline]
     pub fn init() -> Self {
         Self {
             playing: RwLock::new(false),
@@ -41,21 +33,13 @@ impl Metronome {
             tick_memory: DashMap::default(),
         }
     }
+    #[inline]
+    pub fn main(state: Arc<Self>, common: Arc<CommonState>) -> ! {
+        main(state, common)
+    }
 }
 
 // LYN: Metronome Main Routine
-
-impl Metronome {
-    pub fn main(state: Arc<Self>, common: Arc<CommonState>, cmd_tx: mpsc::Sender<MainAppCmd>) {
-        thread::spawn(|| main(state, common)).join().unwrap_err();
-        error!("Metronome panicked");
-        cmd_tx
-            .send(MainAppCmd::ShowError(
-                "Metronome thread unexpectedly panicked".to_string(),
-            ))
-            .expect("Failed to request error to be displayed on UI");
-    }
-}
 
 fn main(state: Arc<Metronome>, common: Arc<CommonState>) -> ! {
     info!("Metronome started");
@@ -90,12 +74,13 @@ fn main(state: Arc<Metronome>, common: Arc<CommonState>) -> ! {
 
         // update tick
         {
+            let limit = common.metro_tick_limit();
             let mut curr_tick_guard = state.curr_tick.write();
-            match common.metro_tick_limit() {
+            match limit {
                 Some(top_tick) if *curr_tick_guard >= top_tick => *curr_tick_guard = 0,
                 _ => *curr_tick_guard = curr_tick_guard.saturating_add(1),
             }
-            // debug!("{}/{:?}", state.curr_tick.read(), limit);
+            trace!("{}/{:?}", *curr_tick_guard, limit);
         }
     }
 }
