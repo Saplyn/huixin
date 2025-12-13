@@ -3,5 +3,18 @@ name = "huisheng"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
+build = "build.rs"
+
+[build-dependencies]
+chrono = { workspace = true, features = ["clock"] }
 
 [dependencies]
+# EGUI
+eframe = { workspace = true, features = ["default"] }
+egui = { workspace = true }
+egui-snarl = "0.9"
+# Logging
+log = { workspace = true }
+simplelog = { workspace = true, features = ["termcolor"] }
+# Misc
+lyn-util = { workspace = true }

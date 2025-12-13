@@ -6,15 +6,15 @@ use std::{
 
 use parking_lot::RwLock;
 
-use crate::{
-    app::{
-        helpers::WidgetId,
-        tools::{
-            ToolWindow, connection_manager::ConnectionManager, pattern_editor::PatternEditor,
-            tester::Tester,
-        },
-        widgets::{error_modal::ErrorModal, performance::Performance},
+use self::{
+    helpers::WidgetId,
+    tools::{
+        ToolWindow, connection_manager::ConnectionManager, pattern_editor::PatternEditor,
+        tester::Tester,
     },
+    widgets::{error_modal::ErrorModal, performance::Performance},
+};
+use crate::{
     model::pattern::{
         SheetPattern, SheetPatternTrait, SheetPatternType,
         midi::{MidiNote, MidiPattern},

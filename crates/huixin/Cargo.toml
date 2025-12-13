@@ -6,7 +6,7 @@ authors.workspace = true
 build = "build.rs"
 
 [build-dependencies]
-chrono = "0.4"
+chrono = { workspace = true, features = ["clock"] }
 
 [dependencies]
 # EGUI
@@ -14,10 +14,9 @@ eframe = { workspace = true, features = ["default"] }
 egui = { workspace = true }
 ecolor = { workspace = true }
 emath = { workspace = true }
-egui_extras = { workspace = true }
 # Logging
 log = { workspace = true }
-simplelog = { workspace = true }
+simplelog = { workspace = true, features = ["termcolor"] }
 # Concurrency
 parking_lot = "0.12"
 dashmap = { version = "7.0.0-rc2" }
