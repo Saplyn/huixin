@@ -1,6 +1,7 @@
 use std::net::TcpStream;
 
 use lyn_util::{comm::Instruction, egui::LynId};
+use ws::{WebSocket, stream::MaybeTlsStream};
 
 pub mod pattern;
 pub mod track;
@@ -11,13 +12,13 @@ pub struct SheetMessage {
     pub payload: Instruction,
 }
 
-const DEFAULT_COMM_TARGET_ADDR: &str = "127.0.0.1:3000";
+const DEFAULT_COMM_TARGET_ADDR: &str = "ws://127.0.0.1:3000";
 
 #[derive(Debug)]
 pub struct CommTarget {
     pub name: String,
     pub addr: String,
-    pub stream: Option<TcpStream>,
+    pub stream: Option<WebSocket<MaybeTlsStream<TcpStream>>>,
 }
 
 impl Default for CommTarget {

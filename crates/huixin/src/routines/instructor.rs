@@ -1,6 +1,4 @@
 use std::{
-    io::Write,
-    net::TcpStream,
     sync::{Arc, mpsc},
     thread,
     time::Duration,
@@ -51,28 +49,22 @@ fn main(state: Arc<Instructor>, msg_rx: mpsc::Receiver<SheetMessage>) -> ! {
             };
             let entry = entry.clone();
             state.workers.spawn(move || {
-                let mut guard = entry.upgradable_read();
+                let mut guard = entry.write();
                 if guard.stream.is_none() {
-                    guard.with_upgraded(|target| {
-                        target.stream = TcpStream::connect(&target.addr).ok();
-                    });
+                    guard.stream = ws::connect(&guard.addr).map(|ret| ret.0).ok();
                     return;
                 }
-                if let Err(err) = guard.stream.as_ref().unwrap().write_all(
-                    format!(
-                        "{};",
-                        ron::to_string(&msg.payload)
-                            .expect("Failed to serialize instruction payload")
-                    )
-                    .as_bytes(),
+                if let Err(err) = guard.stream.as_mut().unwrap().send(
+                    msg.payload
+                        .form_string()
+                        .expect("Failed to serialize instruction payload")
+                        .into(),
                 ) {
                     warn!(
                         "Failed to send insturction payload to {}: {err}",
                         guard.addr
                     );
-                    guard.with_upgraded(|target| {
-                        target.stream = TcpStream::connect(&target.addr).ok();
-                    });
+                    guard.stream = ws::connect(&guard.addr).map(|ret| ret.0).ok();
                 }
             });
             continue;
@@ -84,7 +76,7 @@ fn main(state: Arc<Instructor>, msg_rx: mpsc::Receiver<SheetMessage>) -> ! {
                 let target_entry = target_entry.clone();
                 state.workers.spawn(move || {
                     let mut guard = target_entry.write();
-                    let stream = TcpStream::connect(&guard.addr);
+                    let stream = ws::connect(&guard.addr).map(|ret| ret.0);
                     trace!("{stream:?}");
                     guard.stream = stream.ok();
                 });

@@ -54,7 +54,7 @@ impl ToolWindow for ConnectionManager {
         egui::Window::new("连接管理")
             .id(WidgetId::ConnectionManager.into())
             .frame(egui::Frame::window(&ctx.style()).inner_margin(egui::Margin::ZERO))
-            .collapsible(false)
+            .collapsible(true)
             .open(&mut open)
             .min_size(emath::vec2(300., 150.))
             .default_size(emath::vec2(400., 300.))

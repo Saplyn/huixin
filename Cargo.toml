@@ -19,7 +19,8 @@ chrono = { version = "0.4", default-features = false }
 log = { version = "0.4", default-features = false }
 simplelog = { version = "0.12", default-features = false }
 # Communication
+ws = { package = "tungstenite", version = "0.28.0", default-features = false }
 serde = { version = "1.0", default-features = false }
-ron = { version = "0.12", default-features = false }
+json = { package = "serde_json", version = "1.0", default-features = false }
 # Misc
 lyn-util = { path = "crates/util" }

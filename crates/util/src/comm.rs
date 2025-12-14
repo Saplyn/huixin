@@ -2,14 +2,16 @@ use std::ops;
 
 use serde::{Deserialize, Serialize};
 
+pub type DataMap = json::Map<String, json::Value>;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Instruction {
     pub tag: String,
-    pub data: ron::Map,
+    pub data: DataMap,
 }
 
 impl ops::Deref for Instruction {
-    type Target = ron::Map;
+    type Target = DataMap;
     fn deref(&self) -> &Self::Target {
         &self.data
     }
@@ -26,7 +28,11 @@ impl Instruction {
     pub fn new(tag: String) -> Self {
         Self {
             tag,
-            data: ron::Map::new(),
+            data: DataMap::new(),
         }
+    }
+
+    pub fn form_string(&self) -> Result<String, json::Error> {
+        json::to_string(&self)
     }
 }

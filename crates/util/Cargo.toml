@@ -10,5 +10,6 @@ authors.workspace = true
 egui = { workspace = true }
 epaint = { workspace = true }
 # Communication
+ws = { workspace = true, features = ["default"] }
 serde = { workspace = true }
-ron = { workspace = true }
+json = { workspace = true, features = ["default"] }

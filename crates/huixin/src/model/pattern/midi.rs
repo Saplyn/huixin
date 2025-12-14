@@ -1,7 +1,10 @@
 use std::collections::{BTreeMap, HashMap};
 
 use either::Either;
-use lyn_util::{comm::Instruction, egui::LynId};
+use lyn_util::{
+    comm::{DataMap, Instruction},
+    egui::LynId,
+};
 
 use crate::{model::SheetMessage, routines::metronome::TICK_PER_BEAT};
 
@@ -266,11 +269,11 @@ impl MidiNote {
         self.start + self.length
     }
     #[inline]
-    pub fn form_data(&self) -> ron::Map {
-        let mut map = ron::Map::new();
-        map.insert("midicode", self.midicode);
-        map.insert("strength", self.strength);
-        map.insert("length", self.length);
+    pub fn form_data(&self) -> DataMap {
+        let mut map = DataMap::new();
+        map.insert("midicode".to_string(), self.midicode.into());
+        map.insert("strength".to_string(), self.strength.into());
+        map.insert("length".to_string(), self.length.into());
         map
     }
 }
