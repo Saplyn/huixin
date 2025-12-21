@@ -1,10 +1,15 @@
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::{
+    cell::RefCell,
+    hash::{DefaultHasher, Hash, Hasher},
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use egui::{
     FontData, FontFamily,
     epaint::text::{FontInsert, InsertFontFamily},
 };
 use epaint::text::FontPriority;
+use rand::{Rng, rngs::ThreadRng};
 
 // LYN: Chinese Font Loader
 
@@ -46,15 +51,30 @@ impl EguiContextExt for egui::Context {
 
 // LYN: Custom Identifier
 
-const ID_HASH_PREFIX: &str = "LynId";
+const NUM_HASH_PREFIX: &str = "LynNumId";
+const STR_HASH_INFIX: &str = "LynStrId";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LynId(u64);
 
 impl LynId {
-    pub fn obtain_id() -> LynId {
+    pub fn obtain() -> LynId {
         static COUNTER: AtomicU64 = AtomicU64::new(1);
         LynId(COUNTER.fetch_add(1, Ordering::Relaxed))
+    }
+
+    pub fn obtain_string() -> String {
+        thread_local! {
+            pub static RNG: RefCell<ThreadRng> = RefCell::new(rand::rng());
+        }
+        let mut state = DefaultHasher::new();
+        let num = RNG.with(|rng| {
+            let mut rng = rng.borrow_mut();
+            (rng.random::<u64>(), rng.random::<u64>())
+        });
+        num.0.hash(&mut state);
+        (STR_HASH_INFIX, num.1).hash(&mut state);
+        format!("{:x}", state.finish())
     }
 }
 
@@ -66,6 +86,6 @@ impl From<LynId> for egui::Id {
 
 impl std::hash::Hash for LynId {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        (ID_HASH_PREFIX, self.0).hash(state);
+        (NUM_HASH_PREFIX, self.0).hash(state);
     }
 }

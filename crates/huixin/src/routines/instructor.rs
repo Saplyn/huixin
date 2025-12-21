@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     sync::{Arc, mpsc},
     thread,
     time::Duration,
@@ -6,7 +7,6 @@ use std::{
 
 use dashmap::DashMap;
 use log::{info, trace, warn};
-use lyn_util::egui::LynId;
 use parking_lot::RwLock;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
@@ -18,7 +18,7 @@ const NO_MSG_CHECK_HEALTH_INTERVAL: Duration = Duration::from_millis(50);
 
 #[derive(Debug)]
 pub struct Instructor {
-    targets: DashMap<LynId, Arc<RwLock<CommTarget>>>,
+    targets: DashMap<String, Arc<RwLock<CommTarget>>>,
 
     workers: ThreadPool,
 }
@@ -49,6 +49,7 @@ fn main(state: Arc<Instructor>, msg_rx: mpsc::Receiver<SheetMessage>) -> ! {
             };
             let entry = entry.clone();
             state.workers.spawn(move || {
+                // TODO: should I use `try_write()`
                 let mut guard = entry.write();
                 if guard.stream.is_none() {
                     guard.stream = ws::connect(&guard.addr).map(|ret| ret.0).ok();
@@ -72,12 +73,14 @@ fn main(state: Arc<Instructor>, msg_rx: mpsc::Receiver<SheetMessage>) -> ! {
 
         // check target health
         for target_entry in state.targets() {
-            if target_entry.read().stream.is_none() {
+            if target_entry
+                .try_read()
+                .is_some_and(|guard| guard.stream.is_none())
+            {
                 let target_entry = target_entry.clone();
                 state.workers.spawn(move || {
                     let mut guard = target_entry.write();
                     let stream = ws::connect(&guard.addr).map(|ret| ret.0);
-                    trace!("{stream:?}");
                     guard.stream = stream.ok();
                 });
             }
@@ -89,7 +92,19 @@ fn main(state: Arc<Instructor>, msg_rx: mpsc::Receiver<SheetMessage>) -> ! {
 // LYN: Instructor Public APIs
 
 impl Instructor {
-    pub fn targets(&self) -> &DashMap<LynId, Arc<RwLock<CommTarget>>> {
+    #[inline]
+    pub fn targets(&self) -> &DashMap<String, Arc<RwLock<CommTarget>>> {
         &self.targets
+    }
+
+    #[inline]
+    pub fn spawn(&self, f: impl FnOnce() + Send + 'static) {
+        self.workers.spawn(f);
+    }
+
+    pub fn restore_state(&self, targets: HashMap<String, CommTarget>) {
+        for (id, target) in targets {
+            self.targets.insert(id, Arc::new(RwLock::new(target)));
+        }
     }
 }

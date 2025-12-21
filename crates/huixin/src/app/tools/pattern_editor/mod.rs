@@ -5,7 +5,7 @@ use crate::{
         CommonState,
         helpers::WidgetId,
         tools::{
-            ToolWindow,
+            ToolWindow, ToolWindowId,
             pattern_editor::midi_editor::{MidiEditor, MidiEditorState},
         },
     },
@@ -47,6 +47,9 @@ impl PatternEditor {
 }
 
 impl ToolWindow for PatternEditor {
+    fn tool_id(&self) -> ToolWindowId {
+        ToolWindowId::PatternEditor
+    }
     fn icon(&self) -> String {
         "󰎅 ".to_string()
     }
@@ -77,7 +80,7 @@ impl ToolWindow for PatternEditor {
             .min_size(emath::vec2(300., 150.))
             .default_size(emath::vec2(400., 300.))
             .show(ctx, |ui| {
-                let Some(pat) = self.common.selected_pattern() else {
+                let Some(pat) = self.common.selected_pattern(self.sheet_reader.clone()) else {
                     ui.disable();
                     ui.with_layout(
                         egui::Layout::centered_and_justified(egui::Direction::LeftToRight),

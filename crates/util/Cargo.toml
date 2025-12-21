@@ -4,12 +4,15 @@ edition.workspace = true
 version.workspace = true
 authors.workspace = true
 
-
 [dependencies]
 # EGUI
 egui = { workspace = true }
 epaint = { workspace = true }
 # Communication
 ws = { workspace = true, features = ["default"] }
+# Encoding
 serde = { workspace = true }
 json = { workspace = true, features = ["default"] }
+toml = { workspace = true, features = ["default"] }
+# Misc
+rand = "0.10.0-rc.5"

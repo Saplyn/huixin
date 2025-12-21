@@ -4,7 +4,11 @@ use lyn_util::egui::LynId;
 use parking_lot::RwLock;
 
 use crate::{
-    app::{CommonState, helpers::WidgetId, tools::ToolWindow},
+    app::{
+        CommonState,
+        helpers::WidgetId,
+        tools::{ToolWindow, ToolWindowId},
+    },
     model::CommTarget,
     routines::instructor::Instructor,
 };
@@ -30,6 +34,9 @@ impl ConnectionManager {
 }
 
 impl ToolWindow for ConnectionManager {
+    fn tool_id(&self) -> ToolWindowId {
+        ToolWindowId::ConnectionManager
+    }
     fn icon(&self) -> String {
         "󱘖 ".to_string()
     }
@@ -87,7 +94,7 @@ impl ToolWindow for ConnectionManager {
                                         guard.stream = None;
                                     }
                                     if ui.button(" ").clicked() {
-                                        to_be_removed.push(*entry.key());
+                                        to_be_removed.push(entry.key().clone());
                                     }
                                 });
                             }
@@ -96,7 +103,7 @@ impl ToolWindow for ConnectionManager {
                             }
                             if ui.button("新增通讯目标").clicked() {
                                 targets.insert(
-                                    LynId::obtain_id(),
+                                    LynId::obtain_string(),
                                     Arc::new(RwLock::new(CommTarget::default())),
                                 );
                             };

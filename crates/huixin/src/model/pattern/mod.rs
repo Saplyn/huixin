@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::model::SheetMessage;
 
 use self::midi::MidiPattern;
@@ -13,7 +15,7 @@ pub enum SheetPatternType {
     // Event,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SheetPattern {
     Midi(MidiPattern),
     // Curve(CurvePattern),

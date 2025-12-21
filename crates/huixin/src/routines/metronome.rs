@@ -4,7 +4,10 @@ use dashmap::DashMap;
 use log::{info, trace};
 use parking_lot::{RwLock, RwLockWriteGuard};
 
-use crate::{app::CommonState, routines::RoutineId};
+use crate::{
+    app::CommonState,
+    routines::{RoutineId, sheet_reader::SheetReader},
+};
 
 pub const TICK_PER_BEAT: u64 = 4;
 pub const SLEEP_PER_TICK: u32 = 50;
@@ -34,14 +37,14 @@ impl Metronome {
         }
     }
     #[inline]
-    pub fn main(state: Arc<Self>, common: Arc<CommonState>) -> ! {
-        main(state, common)
+    pub fn main(state: Arc<Self>, common: Arc<CommonState>, sheet_reader: Arc<SheetReader>) -> ! {
+        main(state, common, sheet_reader)
     }
 }
 
 // LYN: Metronome Main Routine
 
-fn main(state: Arc<Metronome>, common: Arc<CommonState>) -> ! {
+fn main(state: Arc<Metronome>, common: Arc<CommonState>, sheet_reader: Arc<SheetReader>) -> ! {
     info!("Metronome started");
     let (mut interval, mut sleep_time) = bpm_to_tickable(*state.bpm.read());
     let mut remaining = interval;
@@ -74,7 +77,7 @@ fn main(state: Arc<Metronome>, common: Arc<CommonState>) -> ! {
 
         // update tick
         {
-            let limit = common.metro_tick_limit();
+            let limit = common.metro_tick_limit(sheet_reader.clone());
             let mut curr_tick_guard = state.curr_tick.write();
             match limit {
                 Some(top_tick) if *curr_tick_guard >= top_tick => *curr_tick_guard = 0,
@@ -145,6 +148,10 @@ impl Metronome {
             self.tick_memory.insert(id, *curr_tick);
             Some(*curr_tick)
         }
+    }
+
+    pub fn restore_state(&self, bpm: f64) {
+        *self.bpm.write() = bpm;
     }
 }
 

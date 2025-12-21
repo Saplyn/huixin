@@ -1,7 +1,11 @@
 use std::sync::Arc;
 
 use crate::{
-    app::{CommonState, helpers::WidgetId, tools::ToolWindow},
+    app::{
+        CommonState,
+        helpers::WidgetId,
+        tools::{ToolWindow, ToolWindowId},
+    },
     routines::{metronome::Metronome, sheet_reader::SheetReader},
 };
 
@@ -29,6 +33,9 @@ impl Tester {
 }
 
 impl ToolWindow for Tester {
+    fn tool_id(&self) -> ToolWindowId {
+        ToolWindowId::Tester
+    }
     fn icon(&self) -> String {
         "󰙨 ".to_string()
     }
@@ -99,11 +106,7 @@ impl Tester {
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.code(format!(
                 "*selected_pattern: {:#?}",
-                self.common
-                    .selected_pattern
-                    .read()
-                    .as_ref()
-                    .and_then(|weak| weak.upgrade())
+                self.common.selected_pattern(self.sheet_reader.clone())
             ));
             ui.code(format!("{:#?}", self.common));
             ui.separator();

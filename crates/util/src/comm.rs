@@ -4,10 +4,17 @@ use serde::{Deserialize, Serialize};
 
 pub type DataMap = json::Map<String, json::Value>;
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum Format {
+    TcpBasedOsc,
+    WsBasedJson,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Instruction {
     pub tag: String,
     pub data: DataMap,
+    pub format: Format,
 }
 
 impl ops::Deref for Instruction {
@@ -25,14 +32,10 @@ impl ops::DerefMut for Instruction {
 
 impl Instruction {
     #[inline]
-    pub fn new(tag: String) -> Self {
-        Self {
-            tag,
-            data: DataMap::new(),
-        }
-    }
-
     pub fn form_string(&self) -> Result<String, json::Error> {
-        json::to_string(&self)
+        match self.format {
+            Format::TcpBasedOsc => todo!(), // TODO:
+            Format::WsBasedJson => json::to_string(&self),
+        }
     }
 }

@@ -40,14 +40,14 @@ impl Default for MidiEditorState {
 pub struct MidiEditor<'pat, 'state, 'targets> {
     state: &'state mut MidiEditorState,
     midi_pattern: &'pat mut MidiPattern,
-    targets: &'targets DashMap<LynId, Arc<RwLock<CommTarget>>>,
+    targets: &'targets DashMap<String, Arc<RwLock<CommTarget>>>,
 }
 
 impl<'pat, 'state, 'targets> MidiEditor<'pat, 'state, 'targets> {
     pub fn new(
         state: &'state mut MidiEditorState,
         midi_pattern: &'pat mut MidiPattern,
-        targets: &'targets DashMap<LynId, Arc<RwLock<CommTarget>>>,
+        targets: &'targets DashMap<String, Arc<RwLock<CommTarget>>>,
     ) -> Self {
         Self {
             state,
@@ -136,22 +136,20 @@ impl<'pat, 'state, 'targets> MidiEditor<'pat, 'state, 'targets> {
             let target_name = self
                 .midi_pattern
                 .target_id
-                .and_then(|id| {
-                    let ret = self.targets.get(&id);
-                    if ret.is_none() {
-                        self.midi_pattern.target_id = None;
-                    }
-                    ret
-                })
+                .as_ref()
+                .and_then(|id| self.targets.get(id))
                 .map(|target| target.read().name.clone());
+            if target_name.is_none() {
+                self.midi_pattern.target_id = None;
+            }
             egui::ComboBox::from_label("target")
-                .selected_text(target_name.unwrap_or("None".to_string()))
+                .selected_text(target_name.unwrap_or("未选择".to_string()))
                 .show_ui(ui, |ui| {
                     let target_id_mut = &mut self.midi_pattern.target_id;
                     for entry in self.targets.iter() {
                         ui.selectable_value(
                             target_id_mut,
-                            Some(*entry.key()),
+                            Some(entry.key().clone()),
                             &entry.value().read().name,
                         );
                     }

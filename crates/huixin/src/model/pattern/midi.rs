@@ -2,9 +2,10 @@ use std::collections::{BTreeMap, HashMap};
 
 use either::Either;
 use lyn_util::{
-    comm::{DataMap, Instruction},
+    comm::{DataMap, Format, Instruction},
     egui::LynId,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{model::SheetMessage, routines::metronome::TICK_PER_BEAT};
 
@@ -12,7 +13,7 @@ use super::SheetPatternTrait;
 
 // LYN: Midi Pattern
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize)]
 pub struct MidiPattern {
     // pattern
     pub name: String,
@@ -21,19 +22,20 @@ pub struct MidiPattern {
     pub beats: u64,
 
     // pattern internal
+    #[serde(skip_serializing)]
     end_tick_map: BTreeMap<u64, u32>,
     notes: HashMap<u64, Vec<MidiNote>>,
 
     // communication
     pub tag: String,
-    pub target_id: Option<LynId>,
+    pub target_id: Option<String>,
 }
 
 impl MidiPattern {
-    pub fn new(name: String, icon: Option<String>) -> Self {
+    pub fn new() -> Self {
         Self {
-            name,
-            icon: icon.unwrap_or(String::from("󰄛 ")),
+            name: String::from("未命名"),
+            icon: String::from("󰄛 "),
             beats: 1,
             end_tick_map: BTreeMap::new(),
             notes: HashMap::new(),
@@ -221,17 +223,18 @@ impl SheetPatternTrait for MidiPattern {
 
     #[inline]
     fn msg_at(&self, tick: u64) -> Vec<SheetMessage> {
-        let Some(target_id) = self.target_id else {
+        let Some(target_id) = self.target_id.as_ref() else {
             return Vec::new();
         };
         self.notes.get(&tick).map_or_else(Vec::new, |notes| {
             notes
                 .iter()
                 .map(|note| SheetMessage {
-                    target_id,
+                    target_id: target_id.clone(),
                     payload: Instruction {
                         tag: self.tag.clone(),
                         data: note.form_data(),
+                        format: Format::WsBasedJson,
                     },
                 })
                 .collect()
@@ -239,10 +242,47 @@ impl SheetPatternTrait for MidiPattern {
     }
 }
 
+impl<'de> Deserialize<'de> for MidiPattern {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct MidiPatternDeser {
+            name: String,
+            icon: String,
+            beats: u64,
+            notes: HashMap<u64, Vec<MidiNote>>,
+            tag: String,
+            target_id: Option<String>,
+        }
+        let deser = MidiPatternDeser::deserialize(deserializer)?;
+        let mut end_tick_map = BTreeMap::new();
+        for (_, notes) in deser.notes.iter() {
+            for note in notes {
+                end_tick_map
+                    .entry(note.end_tick())
+                    .and_modify(|count| *count += 1)
+                    .or_insert(1);
+            }
+        }
+        Ok(Self {
+            name: deser.name,
+            icon: deser.icon,
+            beats: deser.beats,
+            end_tick_map,
+            notes: deser.notes,
+            tag: deser.tag,
+            target_id: deser.target_id,
+        })
+    }
+}
+
 // LYN: Midi Note
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub struct MidiNote {
+    #[serde(skip_serializing)]
     id: LynId,
     pub midicode: u8,
     pub strength: u16,
@@ -253,7 +293,7 @@ pub struct MidiNote {
 impl MidiNote {
     pub fn new(midicode: u8, strength: u16, start: u64, length: u64) -> Self {
         Self {
-            id: LynId::obtain_id(),
+            id: LynId::obtain(),
             midicode,
             strength,
             start,
@@ -275,5 +315,28 @@ impl MidiNote {
         map.insert("strength".to_string(), self.strength.into());
         map.insert("length".to_string(), self.length.into());
         map
+    }
+}
+
+impl<'de> Deserialize<'de> for MidiNote {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct MidiNoteDeser {
+            midicode: u8,
+            strength: u16,
+            start: u64,
+            length: u64,
+        }
+        let deser = MidiNoteDeser::deserialize(deserializer)?;
+        Ok(Self {
+            id: LynId::obtain(),
+            midicode: deser.midicode,
+            strength: deser.strength,
+            start: deser.start,
+            length: deser.length,
+        })
     }
 }

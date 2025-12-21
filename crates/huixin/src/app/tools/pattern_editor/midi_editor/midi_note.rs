@@ -17,16 +17,15 @@ pub struct MidiNoteWidget<'pat> {
     tick_snap: u64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MidiNoteDragAction {
-    #[default]
     Move,
     Resize,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
 struct MidiNoteDragState {
-    pub action: MidiNoteDragAction,
+    pub action: Option<MidiNoteDragAction>,
     pub orig_start: u64,
     pub orig_length: u64,
     pub orig_midicode: u8,
@@ -115,20 +114,19 @@ impl<'pat> MidiNoteWidget<'pat> {
         let hit_zone = resp.hover_pos().map(|pos| self.hit_test(rect, pos));
 
         if resp.hovered() {
-            match hit_zone.unwrap() {
-                MidiNoteDragAction::Resize => {
+            match hit_zone {
+                Some(MidiNoteDragAction::Resize) => {
                     ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
                 }
-                MidiNoteDragAction::Move => {
+                Some(MidiNoteDragAction::Move) => {
                     ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
                 }
+                None => (),
             }
         }
 
         if resp.drag_started() {
-            let action = ui
-                .input(|i| i.pointer.press_origin().map(|pos| self.hit_test(rect, pos)))
-                .unwrap_or_default();
+            let action = ui.input(|i| i.pointer.press_origin().map(|pos| self.hit_test(rect, pos)));
             let drag_state = MidiNoteDragState {
                 action,
                 orig_start: self.note.start,
@@ -149,7 +147,7 @@ impl<'pat> MidiNoteWidget<'pat> {
             });
 
             match drag_state.action {
-                MidiNoteDragAction::Move => {
+                Some(MidiNoteDragAction::Move) => {
                     let delta_ticks = self.pixels_to_ticks(total_drag.x);
                     let new_start = self.snap_ticks(drag_state.orig_start as i64 + delta_ticks);
 
@@ -164,7 +162,7 @@ impl<'pat> MidiNoteWidget<'pat> {
                     self.note.start = new_start;
                     self.note.midicode = new_midicode;
                 }
-                MidiNoteDragAction::Resize => {
+                Some(MidiNoteDragAction::Resize) => {
                     let delta_ticks = self.pixels_to_ticks(total_drag.x);
                     let raw = drag_state.orig_length as i64 + delta_ticks;
                     let new_length = self.snap_ticks(raw.max(self.tick_snap as i64));
@@ -175,6 +173,7 @@ impl<'pat> MidiNoteWidget<'pat> {
                         self.note.length = new_length;
                     }
                 }
+                None => (),
             }
         }
 

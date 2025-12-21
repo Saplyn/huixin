@@ -10,21 +10,24 @@ chrono = { workspace = true, features = ["clock"] }
 
 [dependencies]
 # EGUI
-eframe = { workspace = true, features = ["default"] }
-egui = { workspace = true }
+eframe = { workspace = true, features = ["default", "persistence"] }
+egui = { workspace = true, features = ["persistence"] }
 ecolor = { workspace = true }
 emath = { workspace = true }
+rfd = "0.16"
 # Logging
 log = { workspace = true }
 simplelog = { workspace = true, features = ["termcolor"] }
 # Concurrency
-parking_lot = "0.12"
-dashmap = "7.0.0-rc2"
+parking_lot = { version = "0.12", features = ["serde"] }
+dashmap = { version = "7.0.0-rc2", features = ["serde"] }
 rayon = "1.11"
 # Communication
 ws = { workspace = true, features = ["default"] }
+# Encoding
 serde = { workspace = true }
 json = { workspace = true, features = ["default"] }
+toml = { workspace = true, features = ["default"] }
 # Misc
 either = "1.15"
 lyn-util = { workspace = true }
