@@ -1,13 +1,11 @@
 use std::sync::Arc;
 
-use dashmap::DashMap;
-use lyn_util::egui::LynId;
-use parking_lot::RwLock;
+use lyn_util::comm::Format;
 
 use self::{midi_keyboard::MidiKeyboard, midi_note::MidiNoteWidget, midi_rows::MidiRows};
 use crate::{
     app::helpers::WidgetId,
-    model::{CommTarget, pattern::midi::MidiPattern},
+    model::{pattern::midi::MidiPattern, state::CentralState},
     routines::metronome::TICK_PER_BEAT,
 };
 
@@ -19,50 +17,27 @@ pub mod midi_rows;
 const MIN_SIZE_PER_BEAT: f32 = 40.;
 const MAX_SIZE_PER_BEAT: f32 = 400.;
 
-// LYN: Editor Externally Held State
-
-#[derive(Debug)]
-pub struct MidiEditorState {
-    pub size_per_beat: f32,
-}
-
-impl Default for MidiEditorState {
-    fn default() -> Self {
-        Self {
-            size_per_beat: MIN_SIZE_PER_BEAT,
-        }
-    }
-}
-
 // LYN: Midi Editor State
 
 #[derive(Debug)]
-pub struct MidiEditor<'pat, 'state, 'targets> {
-    state: &'state mut MidiEditorState,
+pub struct MidiEditor<'pat> {
     midi_pattern: &'pat mut MidiPattern,
-    targets: &'targets DashMap<String, Arc<RwLock<CommTarget>>>,
+    state: Arc<CentralState>,
 }
 
-impl<'pat, 'state, 'targets> MidiEditor<'pat, 'state, 'targets> {
-    pub fn new(
-        state: &'state mut MidiEditorState,
-        midi_pattern: &'pat mut MidiPattern,
-        targets: &'targets DashMap<String, Arc<RwLock<CommTarget>>>,
-    ) -> Self {
+impl<'pat> MidiEditor<'pat> {
+    pub fn new(midi_pattern: &'pat mut MidiPattern, state: Arc<CentralState>) -> Self {
         Self {
-            state,
             midi_pattern,
-            targets,
+            state,
         }
     }
 }
 
-impl<'pat, 'state, 'targets> MidiEditor<'pat, 'state, 'targets> {
+impl<'pat> MidiEditor<'pat> {
     pub fn show_inside(mut self, ui: &mut egui::Ui) {
         egui::SidePanel::right(WidgetId::PatternEditorMidiDetailPanel)
             .resizable(false)
-            .min_width(150.)
-            .default_width(150.)
             .show_inside(ui, |ui| {
                 self.detail_panel(ui);
             });
@@ -78,16 +53,16 @@ impl<'pat, 'state, 'targets> MidiEditor<'pat, 'state, 'targets> {
                 ui.spacing_mut().item_spacing = emath::vec2(0., 0.);
                 MidiKeyboard.show(ui);
 
+                let size_per_beat = *self.state.ui.pattern_editor_size_per_beat.read();
                 egui::ScrollArea::horizontal().show(ui, |ui| {
-                    MidiRows::new(self.state.size_per_beat, self.midi_pattern).show(ui);
+                    MidiRows::new(size_per_beat, self.midi_pattern).show(ui);
 
                     let notes = self.midi_pattern.notes_iter_owned().collect::<Vec<_>>();
                     for note in notes {
                         MidiNoteWidget::new(
-                            note.id(),
                             self.midi_pattern,
                             note,
-                            self.state.size_per_beat,
+                            size_per_beat,
                             TICK_PER_BEAT / 4,
                         )
                         .show(ui);
@@ -98,7 +73,7 @@ impl<'pat, 'state, 'targets> MidiEditor<'pat, 'state, 'targets> {
     }
 }
 
-impl<'pat, 'state, 'targets> MidiEditor<'pat, 'state, 'targets> {
+impl<'pat> MidiEditor<'pat> {
     fn util_bar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("util bar");
@@ -108,18 +83,25 @@ impl<'pat, 'state, 'targets> MidiEditor<'pat, 'state, 'targets> {
     fn detail_panel(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("图标：");
-            ui.add(egui::TextEdit::singleline(&mut self.midi_pattern.icon).char_limit(2));
+            ui.add_sized(
+                [80., ui.available_height()],
+                egui::TextEdit::singleline(&mut self.midi_pattern.icon).char_limit(2),
+            );
         });
 
         ui.horizontal(|ui| {
             ui.label("名称：");
-            ui.add(egui::TextEdit::singleline(&mut self.midi_pattern.name));
+            ui.add_sized(
+                [80., ui.available_height()],
+                egui::TextEdit::singleline(&mut self.midi_pattern.name),
+            );
         });
 
         ui.horizontal(|ui| {
             ui.label("长度：");
             let min_beats = self.midi_pattern.min_beats();
-            ui.add(
+            ui.add_sized(
+                [80., ui.available_height()],
                 egui::DragValue::new(&mut self.midi_pattern.beats)
                     .range(min_beats..=(u64::MAX >> 2)),
             );
@@ -127,7 +109,10 @@ impl<'pat, 'state, 'targets> MidiEditor<'pat, 'state, 'targets> {
 
         ui.horizontal(|ui| {
             ui.label("标识：");
-            ui.add(egui::TextEdit::singleline(&mut self.midi_pattern.tag));
+            ui.add_sized(
+                [80., ui.available_height()],
+                egui::TextEdit::singleline(&mut self.midi_pattern.tag),
+            );
         });
 
         ui.horizontal(|ui| {
@@ -137,16 +122,26 @@ impl<'pat, 'state, 'targets> MidiEditor<'pat, 'state, 'targets> {
                 .midi_pattern
                 .target_id
                 .as_ref()
-                .and_then(|id| self.targets.get(id))
+                .and_then(|id| self.state.sheet_get_comm_target(id))
                 .map(|target| target.read().name.clone());
             if target_name.is_none() {
                 self.midi_pattern.target_id = None;
             }
-            egui::ComboBox::from_label("target")
-                .selected_text(target_name.unwrap_or("未选择".to_string()))
+            let target_name = {
+                let name = target_name.unwrap_or("未选择".to_string());
+                let chars = name.chars();
+                if chars.clone().count() <= 4 {
+                    name
+                } else {
+                    name.chars().take(3).chain("…".chars()).collect()
+                }
+            };
+            egui::ComboBox::new(WidgetId::PatternEditorMidiComboBoxCommTarget, "")
+                .selected_text(target_name)
+                .width(80.)
                 .show_ui(ui, |ui| {
                     let target_id_mut = &mut self.midi_pattern.target_id;
-                    for entry in self.targets.iter() {
+                    for entry in self.state.sheet_comm_targets_iter() {
                         ui.selectable_value(
                             target_id_mut,
                             Some(entry.key().clone()),

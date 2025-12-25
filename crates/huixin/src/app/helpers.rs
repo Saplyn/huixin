@@ -16,6 +16,7 @@ pub enum WidgetId {
     PatternEditorMidiUtilBar,
     PatternEditorMidiDetailPanel,
     PatternEditorMidiDetailPanelGrid,
+    PatternEditorMidiComboBoxCommTarget,
 
     ConnectionManager,
 }

@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 pub mod connection_manager;
 pub mod pattern_editor;
@@ -18,4 +18,15 @@ pub enum ToolWindowId {
     PatternEditor,
     ConnectionManager,
     Tester,
+}
+
+impl Display for ToolWindowId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ToolWindowId::PatternEditor => "Pattern Editor",
+            ToolWindowId::ConnectionManager => "Connection Manager",
+            ToolWindowId::Tester => "Tester",
+        };
+        write!(f, "{}", s)
+    }
 }

@@ -5,31 +5,21 @@ use parking_lot::RwLock;
 
 use crate::{
     app::{
-        CommonState,
         helpers::WidgetId,
         tools::{ToolWindow, ToolWindowId},
     },
-    model::CommTarget,
-    routines::instructor::Instructor,
+    model::{CommTarget, state::CentralState},
 };
 
 #[derive(Debug)]
 pub struct ConnectionManager {
-    // ui states
     open: bool,
-
-    // logic states
-    common: Arc<CommonState>,
-    instructor: Arc<Instructor>,
+    state: Arc<CentralState>,
 }
 
 impl ConnectionManager {
-    pub fn new(common: Arc<CommonState>, instructor: Arc<Instructor>) -> Self {
-        Self {
-            open: false,
-            common,
-            instructor,
-        }
+    pub fn new(state: Arc<CentralState>) -> Self {
+        Self { open: false, state }
     }
 }
 
@@ -62,6 +52,7 @@ impl ToolWindow for ConnectionManager {
             .id(WidgetId::ConnectionManager.into())
             .frame(egui::Frame::window(&ctx.style()).inner_margin(egui::Margin::ZERO))
             .collapsible(true)
+            .resizable([false, true])
             .open(&mut open)
             .min_size(emath::vec2(300., 150.))
             .default_size(emath::vec2(400., 300.))
@@ -70,7 +61,7 @@ impl ToolWindow for ConnectionManager {
                     egui::Frame::new()
                         .inner_margin(ui.style().spacing.item_spacing)
                         .show(ui, |ui| {
-                            let targets = self.instructor.targets();
+                            let targets = self.state.sheet_comm_targets_iter();
                             let mut to_be_removed = Vec::new();
                             for entry in targets.iter() {
                                 let mut guard = entry.write();
@@ -81,18 +72,34 @@ impl ToolWindow for ConnectionManager {
                                         " "
                                     });
                                     ui.add_sized(
-                                        emath::vec2(100., ui.available_height()),
+                                        [80., ui.available_height()],
                                         egui::TextEdit::singleline(&mut guard.name),
                                     );
                                     if ui
                                         .add_sized(
-                                            emath::vec2(200., ui.available_height()),
+                                            [140., ui.available_height()],
                                             egui::TextEdit::singleline(&mut guard.addr),
                                         )
                                         .changed()
                                     {
                                         guard.stream = None;
                                     }
+                                    egui::ComboBox::new(entry.key(), "")
+                                        .selected_text(guard.format.to_string())
+                                        .show_ui(ui, |ui| {
+                                            for format in lyn_util::comm::Format::variants() {
+                                                if ui
+                                                    .selectable_value(
+                                                        &mut guard.format,
+                                                        *format,
+                                                        format.to_string(),
+                                                    )
+                                                    .clicked()
+                                                {
+                                                    guard.stream = None;
+                                                }
+                                            }
+                                        });
                                     if ui.button(" ").clicked() {
                                         to_be_removed.push(entry.key().clone());
                                     }
@@ -103,7 +110,7 @@ impl ToolWindow for ConnectionManager {
                             }
                             if ui.button("新增通讯目标").clicked() {
                                 targets.insert(
-                                    LynId::obtain_string(),
+                                    LynId::obtain_string().into(),
                                     Arc::new(RwLock::new(CommTarget::default())),
                                 );
                             };

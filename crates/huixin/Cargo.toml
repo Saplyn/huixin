@@ -22,6 +22,7 @@ simplelog = { workspace = true, features = ["termcolor"] }
 parking_lot = { version = "0.12", features = ["serde"] }
 dashmap = { version = "7.0.0-rc2", features = ["serde"] }
 rayon = "1.11"
+interavl = { git = "https://github.com/Saplyn/interavl.git" }
 # Communication
 ws = { workspace = true, features = ["default"] }
 # Encoding

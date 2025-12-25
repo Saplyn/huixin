@@ -1,0 +1,2 @@
+pub const TRACK_TIMELINE_HEIGHT: f32 = 100.;
+pub const TRACK_HEADER_WIDTH: f32 = 150.;

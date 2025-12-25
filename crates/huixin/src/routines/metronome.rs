@@ -1,69 +1,34 @@
 use std::{cmp, sync::Arc, thread, time::Duration};
 
-use dashmap::DashMap;
 use log::{info, trace};
-use parking_lot::{RwLock, RwLockWriteGuard};
 
-use crate::{
-    app::CommonState,
-    routines::{RoutineId, sheet_reader::SheetReader},
-};
+use crate::model::state::CentralState;
 
 pub const TICK_PER_BEAT: u64 = 4;
 pub const SLEEP_PER_TICK: u32 = 50;
 pub const MAX_SLEEP_TIME: Duration = Duration::from_millis(50);
 
-// LYN: Metronome State Holder
-
-#[derive(Debug)]
-pub struct Metronome {
-    // core states
-    playing: RwLock<bool>,
-    bpm: RwLock<f64>,
-    curr_tick: RwLock<u64>,
-
-    // api states
-    tick_memory: DashMap<RoutineId, u64>,
-}
-
-impl Metronome {
-    #[inline]
-    pub fn init() -> Self {
-        Self {
-            playing: RwLock::new(false),
-            bpm: RwLock::new(130.),
-            curr_tick: RwLock::new(0),
-            tick_memory: DashMap::default(),
-        }
-    }
-    #[inline]
-    pub fn main(state: Arc<Self>, common: Arc<CommonState>, sheet_reader: Arc<SheetReader>) -> ! {
-        main(state, common, sheet_reader)
-    }
-}
-
 // LYN: Metronome Main Routine
 
-fn main(state: Arc<Metronome>, common: Arc<CommonState>, sheet_reader: Arc<SheetReader>) -> ! {
+pub fn main(state: Arc<CentralState>) -> ! {
     info!("Metronome started");
-    let (mut interval, mut sleep_time) = bpm_to_tickable(*state.bpm.read());
+    let bpm = state.sheet_bpm();
+    let (mut interval, mut sleep_time) = bpm_to_tickable(bpm);
     let mut remaining = interval;
-    let mut active_bpm = *state.bpm.read();
+    let mut active_bpm = bpm;
 
     loop {
         // handle pause / play
-        while !*state.playing.read() {
+        while !state.metro_playing() {
             thread::sleep(sleep_time);
         }
 
         // handle bpm change
-        {
-            let state_bpm_guard = state.bpm.read();
-            if active_bpm != *state_bpm_guard {
-                active_bpm = *state_bpm_guard;
-                (interval, sleep_time) = bpm_to_tickable(*state_bpm_guard);
-                remaining = cmp::min(remaining, interval);
-            }
+        let state_bpm_guard = state.sheet_bpm();
+        if active_bpm != state_bpm_guard {
+            active_bpm = state_bpm_guard;
+            (interval, sleep_time) = bpm_to_tickable(state_bpm_guard);
+            remaining = cmp::min(remaining, interval);
         }
 
         // sleep to next tick
@@ -77,81 +42,14 @@ fn main(state: Arc<Metronome>, common: Arc<CommonState>, sheet_reader: Arc<Sheet
 
         // update tick
         {
-            let limit = common.metro_tick_limit(sheet_reader.clone());
-            let mut curr_tick_guard = state.curr_tick.write();
+            let limit = state.metro_tick_limit();
+            let mut curr_tick_guard = state.metro_tick_mut();
             match limit {
-                Some(top_tick) if *curr_tick_guard >= top_tick => *curr_tick_guard = 0,
+                top_tick if *curr_tick_guard >= top_tick => *curr_tick_guard = 0,
                 _ => *curr_tick_guard = curr_tick_guard.saturating_add(1),
             }
             trace!("{}/{:?}", *curr_tick_guard, limit);
         }
-    }
-}
-
-// LYN: Metronome Public APIs
-
-impl Metronome {
-    /// Returns whether the metronome is currently playing.
-    pub fn playing(&self) -> bool {
-        *self.playing.read()
-    }
-
-    /// Returns `true` if the metronome is fully stopped.
-    pub fn stopped(&self) -> bool {
-        *self.curr_tick.read() == 0 && !*self.playing.read()
-    }
-
-    /// Toggles the playing state of the metronome.
-    pub fn toggle_playing(&self, value: Option<bool>) {
-        let mut playing = self.playing.write();
-        *playing = value.unwrap_or(!*playing);
-    }
-
-    /// Stops the metronome completely.
-    pub fn stop(&self) {
-        *self.playing.write() = false;
-        *self.curr_tick.write() = 0;
-        self.tick_memory.clear();
-    }
-
-    /// Returns the BPM value.
-    pub fn bpm(&self) -> f64 {
-        *self.bpm.read()
-    }
-
-    /// Returns the current tick.
-    pub fn query_tick(&self) -> u64 {
-        *self.curr_tick.read()
-    }
-
-    /// Returns a writable guard to the BPM value.
-    pub fn bpm_mut(&self) -> RwLockWriteGuard<'_, f64> {
-        self.bpm.write()
-    }
-
-    /// Requests the current tick for the given routine.
-    ///
-    /// A routine may only receive a tick once, any subsequent requests within the same
-    /// tick will return `None`. If the metronome is not playing, `None` is returned.
-    /// To get the current tick without context and restrictions, use `.query_tick()`.
-    pub fn request_tick(&self, id: RoutineId) -> Option<u64> {
-        if !*self.playing.read() {
-            return None;
-        }
-
-        let curr_tick = self.curr_tick.read();
-        if let Some(last_tick) = self.tick_memory.get(&id)
-            && *last_tick == *curr_tick
-        {
-            None
-        } else {
-            self.tick_memory.insert(id, *curr_tick);
-            Some(*curr_tick)
-        }
-    }
-
-    pub fn restore_state(&self, bpm: f64) {
-        *self.bpm.write() = bpm;
     }
 }
 

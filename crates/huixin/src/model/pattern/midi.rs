@@ -7,7 +7,10 @@ use lyn_util::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{model::SheetMessage, routines::metronome::TICK_PER_BEAT};
+use crate::{
+    model::{SheetMessage, state::TargetId},
+    routines::metronome::TICK_PER_BEAT,
+};
 
 use super::SheetPatternTrait;
 
@@ -28,7 +31,7 @@ pub struct MidiPattern {
 
     // communication
     pub tag: String,
-    pub target_id: Option<String>,
+    pub target_id: Option<TargetId>,
 }
 
 impl MidiPattern {
@@ -234,7 +237,7 @@ impl SheetPatternTrait for MidiPattern {
                     payload: Instruction {
                         tag: self.tag.clone(),
                         data: note.form_data(),
-                        format: Format::WsBasedJson,
+                        format: None,
                     },
                 })
                 .collect()
@@ -254,7 +257,7 @@ impl<'de> Deserialize<'de> for MidiPattern {
             beats: u64,
             notes: HashMap<u64, Vec<MidiNote>>,
             tag: String,
-            target_id: Option<String>,
+            target_id: Option<TargetId>,
         }
         let deser = MidiPatternDeser::deserialize(deserializer)?;
         let mut end_tick_map = BTreeMap::new();

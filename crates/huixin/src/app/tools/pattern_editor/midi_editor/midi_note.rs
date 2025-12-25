@@ -9,10 +9,10 @@ use crate::{
 pub const RESIZE_HANDLE_WIDTH: f32 = 6.;
 
 #[derive(Debug)]
+#[must_use]
 pub struct MidiNoteWidget<'pat> {
     pattern: &'pat mut MidiPattern,
     note: MidiNote,
-    id: egui::Id,
     size_per_beat: f32,
     tick_snap: u64,
 }
@@ -33,14 +33,12 @@ struct MidiNoteDragState {
 
 impl<'pat> MidiNoteWidget<'pat> {
     pub fn new(
-        id: impl std::hash::Hash,
         pattern: &'pat mut MidiPattern,
         note: MidiNote,
         size_per_beat: f32,
         tick_snap: u64,
     ) -> Self {
         Self {
-            id: egui::Id::new(id),
             pattern,
             note,
             size_per_beat,
@@ -102,7 +100,7 @@ impl<'pat> MidiNoteWidget<'pat> {
         let anchor = ui.min_rect().left_top();
         let rect = self.calc_rect(anchor);
 
-        let id = self.id;
+        let id = self.note.id().into();
         let resp = ui.interact(rect, id, egui::Sense::click_and_drag());
 
         if resp.secondary_clicked() {
@@ -182,6 +180,8 @@ impl<'pat> MidiNoteWidget<'pat> {
         }
 
         if ui.is_rect_visible(rect) {
+            let painter = ui.painter();
+
             let note_color = ecolor::Color32::from_rgb(100, 149, 237);
             let stroke_color = if resp.hovered() || resp.dragged() {
                 ecolor::Color32::WHITE
@@ -189,7 +189,7 @@ impl<'pat> MidiNoteWidget<'pat> {
                 ecolor::Color32::from_rgb(70, 100, 170)
             };
 
-            ui.painter().rect(
+            painter.rect(
                 rect,
                 2.0,
                 note_color,
@@ -204,8 +204,7 @@ impl<'pat> MidiNoteWidget<'pat> {
                     egui::pos2(rect.max.x - RESIZE_HANDLE_WIDTH, rect.min.y),
                     rect.max,
                 );
-                ui.painter()
-                    .rect_filled(right_handle_rect, 2.0, handle_color);
+                painter.rect_filled(right_handle_rect, 2.0, handle_color);
             }
         }
     }

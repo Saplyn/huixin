@@ -8,7 +8,7 @@ pub mod curve;
 pub mod event;
 pub mod midi;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SheetPatternType {
     Midi,
     // Curve,

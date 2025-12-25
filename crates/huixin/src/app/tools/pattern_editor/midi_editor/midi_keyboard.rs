@@ -4,15 +4,20 @@ use super::constants::{
 };
 
 #[derive(Debug)]
+#[must_use]
 pub struct MidiKeyboard;
 
 impl MidiKeyboard {
     pub fn show(self, ui: &mut egui::Ui) {
         let desired_size = emath::vec2(KEY_ROW_WIDTH, NUMBER_OF_KEYS as f32 * KEY_ROW_HEIGHT);
         let (rect, resp) = ui.allocate_exact_size(desired_size, egui::Sense::all());
+
+        let visuals = ui.style().noninteractive();
+
         if ui.is_rect_visible(rect) {
             let painter = ui.painter_at(rect);
 
+            // white keys
             let mut white_key_y_offset = 0.;
             for key in (0..NUMBER_OF_WHITE_KEYS).rev() {
                 let index = if key == 75 - 1 { 0 } else { (key + 4) % 7 };
@@ -31,7 +36,7 @@ impl MidiKeyboard {
                 painter.rect_stroke(
                     key_rect,
                     0.0,
-                    (1.0, ecolor::Color32::BLUE),
+                    (1.0, visuals.fg_stroke.color),
                     egui::StrokeKind::Inside,
                 );
                 painter.text(
@@ -39,16 +44,13 @@ impl MidiKeyboard {
                     egui::Align2::RIGHT_CENTER,
                     white_key_id_to_midi_num(key),
                     egui::FontId::default(),
-                    if index == 4 {
-                        ecolor::Color32::RED
-                    } else {
-                        ecolor::Color32::DARK_GRAY
-                    },
+                    visuals.text_color(),
                 );
 
                 white_key_y_offset += height;
             }
 
+            // black keys
             let mut black_key_y_offset = -KEY_ROW_HEIGHT;
             for key in (0..NUMBER_OF_BLACK_KEYS).rev() {
                 let index = (key + 4) % 5;
@@ -66,7 +68,7 @@ impl MidiKeyboard {
                 painter.rect_stroke(
                     key_rect,
                     0.0,
-                    (1.0, ecolor::Color32::BLUE),
+                    (1.0, visuals.fg_stroke.color),
                     egui::StrokeKind::Inside,
                 );
                 painter.text(
@@ -74,7 +76,7 @@ impl MidiKeyboard {
                     egui::Align2::RIGHT_CENTER,
                     black_key_id_to_midi_num(key),
                     egui::FontId::default(),
-                    ecolor::Color32::LIGHT_GRAY,
+                    visuals.text_color(),
                 );
             }
         }

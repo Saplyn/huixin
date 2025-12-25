@@ -1,110 +1,65 @@
 use std::{
-    collections::HashMap,
     sync::{Arc, mpsc},
     thread,
     time::Duration,
 };
 
-use dashmap::DashMap;
-use log::{info, trace, warn};
-use parking_lot::RwLock;
-use rayon::{ThreadPool, ThreadPoolBuilder};
+use log::{info, warn};
 
-use crate::model::{CommTarget, SheetMessage};
+use crate::{model::SheetMessage, model::state::CentralState};
 
 const NO_MSG_CHECK_HEALTH_INTERVAL: Duration = Duration::from_millis(50);
 
-// LYN: Instructor State Holder
-
-#[derive(Debug)]
-pub struct Instructor {
-    targets: DashMap<String, Arc<RwLock<CommTarget>>>,
-
-    workers: ThreadPool,
-}
-
-impl Instructor {
-    #[inline]
-    pub fn init() -> Self {
-        Self {
-            targets: DashMap::new(),
-            workers: ThreadPoolBuilder::new().num_threads(4).build().unwrap(),
-        }
-    }
-    #[inline]
-    pub fn main(state: Arc<Self>, msg_rx: mpsc::Receiver<SheetMessage>) -> ! {
-        main(state, msg_rx)
-    }
-}
-
 // LYN: Instructor Main Routine
 
-fn main(state: Arc<Instructor>, msg_rx: mpsc::Receiver<SheetMessage>) -> ! {
+pub fn main(state: Arc<CentralState>, msg_rx: mpsc::Receiver<SheetMessage>) -> ! {
     info!("Instructor started");
 
     loop {
         if let Ok(msg) = msg_rx.try_recv() {
-            let Some(entry) = state.targets().get(&msg.target_id) else {
+            let Some(entry) = state.sheet_comm_targets_iter().get(&msg.target_id) else {
                 continue;
             };
             let entry = entry.clone();
-            state.workers.spawn(move || {
+            state.worker_spawn_task(move || {
                 // TODO: should I use `try_write()`
                 let mut guard = entry.write();
                 if guard.stream.is_none() {
-                    guard.stream = ws::connect(&guard.addr).map(|ret| ret.0).ok();
+                    guard.connect_stream();
                     return;
                 }
+                let format = guard.format;
                 if let Err(err) = guard.stream.as_mut().unwrap().send(
-                    msg.payload
-                        .form_string()
-                        .expect("Failed to serialize instruction payload")
-                        .into(),
+                    dbg!(
+                        msg.payload
+                            .form_string(format)
+                            .expect("Failed to serialize instruction payload")
+                    )
+                    .into(),
                 ) {
                     warn!(
                         "Failed to send insturction payload to {}: {err}",
                         guard.addr
                     );
-                    guard.stream = ws::connect(&guard.addr).map(|ret| ret.0).ok();
+                    guard.connect_stream();
                 }
             });
             continue;
         }
 
         // check target health
-        for target_entry in state.targets() {
+        for target_entry in state.sheet_comm_targets_iter() {
             if target_entry
                 .try_read()
                 .is_some_and(|guard| guard.stream.is_none())
             {
                 let target_entry = target_entry.clone();
-                state.workers.spawn(move || {
+                state.worker_spawn_task(move || {
                     let mut guard = target_entry.write();
-                    let stream = ws::connect(&guard.addr).map(|ret| ret.0);
-                    guard.stream = stream.ok();
+                    guard.connect_stream();
                 });
             }
         }
         thread::sleep(NO_MSG_CHECK_HEALTH_INTERVAL);
-    }
-}
-
-// LYN: Instructor Public APIs
-
-impl Instructor {
-    #[inline]
-    pub fn targets(&self) -> &DashMap<String, Arc<RwLock<CommTarget>>> {
-        &self.targets
-    }
-
-    #[inline]
-    pub fn spawn(&self, f: impl FnOnce() + Send + 'static) {
-        self.workers.spawn(f);
-    }
-
-    pub fn restore_state(&self, targets: HashMap<String, CommTarget>) {
-        for (id, target) in targets {
-            self.targets.insert(id, Arc::new(RwLock::new(target)));
-        }
     }
 }
