@@ -51,7 +51,7 @@ impl TrackEditor {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
                     for track in self.state.sheet_tracks_iter() {
-                        TrackHeader::new(&track.value().write()).show(ui);
+                        TrackHeader::new(track.key(), &mut track.value().write()).show(ui);
                     }
                 });
 

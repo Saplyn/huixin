@@ -8,7 +8,10 @@ use lyn_util::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    model::{DEFAULT_SELECTABLE_COLOR, comm::SheetMessage, state::TargetId},
+    model::{
+        DEFAULT_ICON, DEFAULT_SELECTABLE_COLOR, DEFAULT_TRACK_NAME, comm::SheetMessage,
+        state::TargetId,
+    },
     routines::metronome::TICK_PER_BEAT,
 };
 
@@ -38,8 +41,8 @@ pub struct MidiPattern {
 impl MidiPattern {
     pub fn new() -> Self {
         Self {
-            name: String::from("未命名"),
-            icon: String::from("󰄛 "),
+            name: String::from(DEFAULT_TRACK_NAME),
+            icon: String::from(DEFAULT_ICON),
             color: DEFAULT_SELECTABLE_COLOR,
             beats: 1,
             end_tick_map: BTreeMap::new(),
@@ -177,21 +180,6 @@ impl MidiPattern {
             .next_back()
             .map(|(max_end_tick, _)| max_end_tick.div_ceil(TICK_PER_BEAT))
             .unwrap_or(1)
-    }
-}
-
-impl Default for MidiPattern {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            icon: String::from("󰄛 "),
-            color: DEFAULT_SELECTABLE_COLOR,
-            beats: 1,
-            end_tick_map: BTreeMap::new(),
-            notes: HashMap::new(),
-            tag: String::new(),
-            target_id: None,
-        }
     }
 }
 

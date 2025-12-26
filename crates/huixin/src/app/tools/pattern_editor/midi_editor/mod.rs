@@ -4,7 +4,7 @@ use egui_winit::clipboard::Clipboard;
 
 use self::{midi_keyboard::MidiKeyboard, midi_note::MidiNoteWidget, midi_rows::MidiRows};
 use crate::{
-    app::helpers::WidgetId,
+    app::helpers::{WidgetId, copy_color, parse_color},
     model::{
         pattern::{SheetPatternTrait, midi::MidiPattern},
         state::CentralState,
@@ -105,34 +105,13 @@ impl<'pat> MidiEditor<'pat> {
                 egui::color_picker::Alpha::Opaque,
             );
             if ui.button("󰆏 ").clicked() {
-                let (r, g, b, _) = self.midi_pattern.color.to_tuple();
-                let hex = format!("#{r:02X}{g:02X}{b:02X}");
-                Clipboard::new(None).set_text(hex);
+                copy_color(self.midi_pattern.color);
             }
             if ui.button("󰆒 ").clicked()
                 && let Some(text) = Clipboard::new(None).get()
+                && let Some(color) = parse_color(text)
             {
-                let s = text.trim().trim_start_matches('#');
-                if s.len() == 6 && s.chars().all(|c| c.is_ascii_hexdigit()) {
-                    if let (Ok(r), Ok(g), Ok(b)) = (
-                        u8::from_str_radix(&s[0..2], 16),
-                        u8::from_str_radix(&s[2..4], 16),
-                        u8::from_str_radix(&s[4..6], 16),
-                    ) {
-                        self.midi_pattern.color = ecolor::Color32::from_rgb(r, g, b);
-                    }
-                } else {
-                    let parts: Vec<&str> = s.split(',').map(|s| s.trim()).collect();
-                    if parts.len() == 3
-                        && let (Ok(r), Ok(g), Ok(b)) = (
-                            parts[0].parse::<u8>(),
-                            parts[1].parse::<u8>(),
-                            parts[2].parse::<u8>(),
-                        )
-                    {
-                        self.midi_pattern.color = ecolor::Color32::from_rgb(r, g, b);
-                    }
-                }
+                self.midi_pattern.color = color;
             };
         });
 

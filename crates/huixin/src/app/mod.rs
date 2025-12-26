@@ -258,8 +258,8 @@ impl MainApp {
         });
 
         egui::SidePanel::left(WidgetId::MainAppLeftExplorerPanel)
-            .min_width(200.)
-            .max_width(200.)
+            .min_width(240.)
+            .max_width(240.)
             .resizable(false)
             .show(ctx, |ui| {
                 egui::Frame::NONE
@@ -399,10 +399,7 @@ impl MainApp {
 
     fn explorer(&mut self, ui: &mut egui::Ui) {
         if ui
-            .add_sized(
-                [ui.available_width(), 30.],
-                egui::Button::new(egui::RichText::new("添加片段")),
-            )
+            .add_sized([ui.available_width(), 30.], egui::Button::new("添加片段"))
             .clicked()
         {
             self.state.sheet_add_pattern(SheetPatternType::Midi);
@@ -414,13 +411,15 @@ impl MainApp {
                 let guard = entry.value().read();
                 ui.horizontal(|ui| {
                     ui.style_mut().spacing.item_spacing = emath::vec2(4., 0.);
-                    let icon_button = ui.add(
+                    let pat_color = guard.color();
+                    let icon_button = ui.add_sized(
+                        [46., ui.available_height()],
                         egui::Button::new(
                             egui::RichText::new(guard.icon_ref())
-                                .color(guard.color().lerp_to_gamma(text_color(guard.color()), 0.6))
-                                .heading(),
+                                .heading()
+                                .color(pat_color.lerp_to_gamma(text_color(pat_color), 0.6)),
                         )
-                        .fill(guard.color()),
+                        .fill(pat_color),
                     );
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {

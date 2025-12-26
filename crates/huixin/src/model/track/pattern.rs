@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize, ser::SerializeStruct};
 
 use crate::{
     model::{
+        DEFAULT_ICON, DEFAULT_PATTERN_NAME, DEFAULT_SELECTABLE_COLOR,
         comm::SheetMessage,
         pattern::SheetPatternTrait,
         state::{CentralState, PatternId},
@@ -17,6 +18,8 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct PatternTrack {
     pub name: String,
+    pub icon: String,
+    pub color: ecolor::Color32,
 
     patterns: IntervalTree<u64, Vec<(LynId, PatternId)>>,
 }
@@ -24,7 +27,9 @@ pub struct PatternTrack {
 impl PatternTrack {
     pub fn new() -> Self {
         Self {
-            name: String::from("未命名"),
+            name: String::from(DEFAULT_PATTERN_NAME),
+            icon: String::from(DEFAULT_ICON),
+            color: DEFAULT_SELECTABLE_COLOR,
             patterns: IntervalTree::default(),
         }
     }
@@ -88,6 +93,26 @@ impl SheetTrackTrait for PatternTrack {
         &self.name
     }
     #[inline]
+    fn name_mut(&mut self) -> &mut String {
+        &mut self.name
+    }
+    #[inline]
+    fn icon_ref(&self) -> &String {
+        &self.icon
+    }
+    #[inline]
+    fn icon_mut(&mut self) -> &mut String {
+        &mut self.icon
+    }
+    #[inline]
+    fn color(&self) -> ecolor::Color32 {
+        self.color
+    }
+    #[inline]
+    fn color_mut(&mut self) -> &mut ecolor::Color32 {
+        &mut self.color
+    }
+    #[inline]
     fn msg_at(&self, tick: u64, state: Arc<CentralState>) -> Vec<SheetMessage> {
         let mut msgs = Vec::new();
         for (range, vec) in self.patterns.iter_overlaps(&(tick..tick + 1)) {
@@ -110,6 +135,8 @@ impl Serialize for PatternTrack {
     {
         let mut state = serializer.serialize_struct("PatternTrack", 2)?;
         state.serialize_field("name", &self.name)?;
+        state.serialize_field("icon", &self.icon)?;
+        state.serialize_field("color", &self.color)?;
         let patterns: Vec<(Range<u64>, Vec<PatternId>)> = self
             .patterns
             .iter()
@@ -131,14 +158,18 @@ impl<'de> Deserialize<'de> for PatternTrack {
         #[derive(Deserialize)]
         struct PatternTrackDeser {
             name: String,
+            icon: String,
+            color: ecolor::Color32,
             patterns: Vec<(Range<u64>, Vec<PatternId>)>,
         }
-        let helper = PatternTrackDeser::deserialize(deserializer)?;
+        let deser = PatternTrackDeser::deserialize(deserializer)?;
         let mut pattern_track = PatternTrack {
-            name: helper.name,
+            name: deser.name,
+            icon: deser.icon,
+            color: deser.color,
             patterns: IntervalTree::default(),
         };
-        for (range, pattern_ids) in helper.patterns {
+        for (range, pattern_ids) in deser.patterns {
             let vec = pattern_ids
                 .into_iter()
                 .map(|id| (LynId::obtain(), id))
