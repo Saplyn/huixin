@@ -20,7 +20,7 @@ pub fn main(state: Arc<CentralState>, msg_rx: mpsc::Receiver<SheetMessage>) -> !
 
     loop {
         if let Ok(msg) = msg_rx.try_recv() {
-            let Some(entry) = state.sheet_comm_targets_iter().get(&msg.target_id) else {
+            let Some(entry) = state.sheet_get_comm_target(&msg.target_id) else {
                 continue;
             };
             let entry = entry.clone();

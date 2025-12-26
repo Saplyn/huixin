@@ -61,9 +61,8 @@ impl ToolWindow for ConnectionManager {
                     egui::Frame::new()
                         .inner_margin(ui.style().spacing.item_spacing)
                         .show(ui, |ui| {
-                            let targets = self.state.sheet_comm_targets_iter();
                             let mut to_be_removed = Vec::new();
-                            for entry in targets.iter() {
+                            for entry in self.state.sheet_comm_targets_iter() {
                                 let mut guard = entry.write();
                                 ui.horizontal(|ui| {
                                     ui.label(if guard.stream.is_some() {
@@ -106,13 +105,10 @@ impl ToolWindow for ConnectionManager {
                                 });
                             }
                             for id in to_be_removed {
-                                targets.remove(&id);
+                                self.state.sheet_del_comm_target(&id);
                             }
                             if ui.button("新增通讯目标").clicked() {
-                                targets.insert(
-                                    LynId::obtain_string().into(),
-                                    Arc::new(RwLock::new(CommTarget::default())),
-                                );
+                                self.state.sheet_add_comm_target();
                             };
                         });
                 });

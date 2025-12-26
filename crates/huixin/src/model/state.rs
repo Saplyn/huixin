@@ -180,8 +180,10 @@ impl CentralState {
         self.sheet.bpm.write()
     }
 
-    pub fn sheet_comm_targets_iter(&self) -> &DashMap<TargetId, Arc<RwLock<CommTarget>>> {
-        &self.sheet.targets
+    pub fn sheet_comm_targets_iter(
+        &self,
+    ) -> dashmap::iter::Iter<'_, TargetId, Arc<RwLock<CommTarget>>> {
+        self.sheet.targets.iter()
     }
     pub fn sheet_add_comm_target(&self) -> WithId<TargetId, Arc<RwLock<CommTarget>>> {
         let target = Arc::new(RwLock::new(CommTarget::default()));
