@@ -1848,6 +1848,7 @@ dependencies = [
  "ecolor",
  "eframe",
  "egui",
+ "egui-winit",
  "either",
  "emath",
  "interavl",

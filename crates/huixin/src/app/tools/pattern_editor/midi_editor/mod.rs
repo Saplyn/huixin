@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use egui_winit::clipboard::Clipboard;
+
 use self::{midi_keyboard::MidiKeyboard, midi_note::MidiNoteWidget, midi_rows::MidiRows};
 use crate::{
     app::helpers::WidgetId,
@@ -78,10 +80,11 @@ impl<'pat> MidiEditor<'pat> {
 
 impl<'pat> MidiEditor<'pat> {
     fn detail_panel(&mut self, ui: &mut egui::Ui) {
+        let width = 95.;
         ui.horizontal(|ui| {
             ui.label("图标：");
             ui.add_sized(
-                [80., ui.available_height()],
+                [width, ui.available_height()],
                 egui::TextEdit::singleline(&mut self.midi_pattern.icon).char_limit(2),
             );
         });
@@ -89,7 +92,7 @@ impl<'pat> MidiEditor<'pat> {
         ui.horizontal(|ui| {
             ui.label("名称：");
             ui.add_sized(
-                [80., ui.available_height()],
+                [width, ui.available_height()],
                 egui::TextEdit::singleline(&mut self.midi_pattern.name),
             );
         });
@@ -101,13 +104,43 @@ impl<'pat> MidiEditor<'pat> {
                 &mut self.midi_pattern.color,
                 egui::color_picker::Alpha::Opaque,
             );
+            if ui.button("󰆏 ").clicked() {
+                let (r, g, b, _) = self.midi_pattern.color.to_tuple();
+                let hex = format!("#{r:02X}{g:02X}{b:02X}");
+                Clipboard::new(None).set_text(hex);
+            }
+            if ui.button("󰆒 ").clicked()
+                && let Some(text) = Clipboard::new(None).get()
+            {
+                let s = text.trim().trim_start_matches('#');
+                if s.len() == 6 && s.chars().all(|c| c.is_ascii_hexdigit()) {
+                    if let (Ok(r), Ok(g), Ok(b)) = (
+                        u8::from_str_radix(&s[0..2], 16),
+                        u8::from_str_radix(&s[2..4], 16),
+                        u8::from_str_radix(&s[4..6], 16),
+                    ) {
+                        self.midi_pattern.color = ecolor::Color32::from_rgb(r, g, b);
+                    }
+                } else {
+                    let parts: Vec<&str> = s.split(',').map(|s| s.trim()).collect();
+                    if parts.len() == 3
+                        && let (Ok(r), Ok(g), Ok(b)) = (
+                            parts[0].parse::<u8>(),
+                            parts[1].parse::<u8>(),
+                            parts[2].parse::<u8>(),
+                        )
+                    {
+                        self.midi_pattern.color = ecolor::Color32::from_rgb(r, g, b);
+                    }
+                }
+            };
         });
 
         ui.horizontal(|ui| {
             ui.label("长度：");
             let min_beats = self.midi_pattern.min_beats();
             ui.add_sized(
-                [80., ui.available_height()],
+                [width, ui.available_height()],
                 egui::DragValue::new(&mut self.midi_pattern.beats)
                     .range(min_beats..=(u64::MAX >> 2)),
             );
@@ -116,7 +149,7 @@ impl<'pat> MidiEditor<'pat> {
         ui.horizontal(|ui| {
             ui.label("标识：");
             ui.add_sized(
-                [80., ui.available_height()],
+                [width, ui.available_height()],
                 egui::TextEdit::singleline(&mut self.midi_pattern.tag),
             );
         });
@@ -144,7 +177,7 @@ impl<'pat> MidiEditor<'pat> {
             };
             egui::ComboBox::new(WidgetId::PatternEditorMidiComboBoxCommTarget, "")
                 .selected_text(target_name)
-                .width(80.)
+                .width(width)
                 .show_ui(ui, |ui| {
                     let target_id_mut = &mut self.midi_pattern.target_id;
                     for entry in self.state.sheet_comm_targets_iter() {
