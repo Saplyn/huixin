@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize, ser::SerializeStruct};
 
 use crate::{
     model::{
-        SheetMessage,
+        comm::SheetMessage,
         pattern::SheetPatternTrait,
         state::{CentralState, PatternId},
         track::SheetTrackTrait,
@@ -86,14 +86,6 @@ impl SheetTrackTrait for PatternTrack {
     #[inline]
     fn name_ref(&self) -> &String {
         &self.name
-    }
-    #[inline]
-    fn name_mut(&mut self) -> &mut String {
-        &mut self.name
-    }
-    #[inline]
-    fn set_name(&mut self, name: String) {
-        self.name = name;
     }
     #[inline]
     fn msg_at(&self, tick: u64, state: Arc<CentralState>) -> Vec<SheetMessage> {

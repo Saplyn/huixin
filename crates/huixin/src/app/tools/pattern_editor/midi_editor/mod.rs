@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
-use lyn_util::comm::Format;
-
 use self::{midi_keyboard::MidiKeyboard, midi_note::MidiNoteWidget, midi_rows::MidiRows};
 use crate::{
     app::helpers::WidgetId,
-    model::{pattern::midi::MidiPattern, state::CentralState},
+    model::{
+        pattern::{SheetPatternTrait, midi::MidiPattern},
+        state::CentralState,
+    },
     routines::metronome::TICK_PER_BEAT,
 };
 
@@ -13,9 +14,6 @@ pub mod constants;
 pub mod midi_keyboard;
 pub mod midi_note;
 pub mod midi_rows;
-
-const MIN_SIZE_PER_BEAT: f32 = 40.;
-const MAX_SIZE_PER_BEAT: f32 = 400.;
 
 // LYN: Midi Editor State
 
@@ -42,11 +40,16 @@ impl<'pat> MidiEditor<'pat> {
                 self.detail_panel(ui);
             });
 
-        egui::TopBottomPanel::top(WidgetId::PatternEditorMidiUtilBar)
-            .frame(egui::Frame::NONE.inner_margin(4.))
-            .show_inside(ui, |ui| {
-                self.util_bar(ui);
-            });
+        if !self.midi_pattern.usable() {
+            egui::TopBottomPanel::top(WidgetId::PatternEditorMidiNotificationBar)
+                .frame(egui::Frame::NONE.inner_margin(4.))
+                .show_inside(ui, |ui| {
+                    ui.colored_label(
+                        ui.style().visuals.error_fg_color,
+                        "请确保已通讯选择目标且标识不为空。",
+                    );
+                });
+        }
 
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.horizontal(|ui| {
@@ -74,12 +77,6 @@ impl<'pat> MidiEditor<'pat> {
 }
 
 impl<'pat> MidiEditor<'pat> {
-    fn util_bar(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.label("util bar");
-        });
-    }
-
     fn detail_panel(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("图标：");
@@ -94,6 +91,15 @@ impl<'pat> MidiEditor<'pat> {
             ui.add_sized(
                 [80., ui.available_height()],
                 egui::TextEdit::singleline(&mut self.midi_pattern.name),
+            );
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("颜色：");
+            egui::color_picker::color_edit_button_srgba(
+                ui,
+                &mut self.midi_pattern.color,
+                egui::color_picker::Alpha::Opaque,
             );
         });
 

@@ -8,7 +8,7 @@ use crate::{
         helpers::WidgetId,
         tools::{ToolWindow, ToolWindowId},
     },
-    model::{CommTarget, state::CentralState},
+    model::{comm::CommTarget, state::CentralState},
 };
 
 #[derive(Debug)]
@@ -67,9 +67,9 @@ impl ToolWindow for ConnectionManager {
                                 let mut guard = entry.write();
                                 ui.horizontal(|ui| {
                                     ui.label(if guard.stream.is_some() {
-                                        " "
+                                        egui::RichText::new(" ")
                                     } else {
-                                        " "
+                                        egui::RichText::new(" ").color(ecolor::Color32::RED)
                                     });
                                     ui.add_sized(
                                         [80., ui.available_height()],

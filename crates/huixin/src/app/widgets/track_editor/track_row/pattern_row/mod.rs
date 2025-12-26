@@ -35,10 +35,15 @@ impl<'track> PatternTrackRow<'track> {
         let desired_size = emath::vec2(width, TRACK_TIMELINE_HEIGHT);
         let (rect, resp) = ui.allocate_exact_size(desired_size, egui::Sense::click_and_drag());
 
+        if resp.hovered() && self.state.selected_pattern_id().is_none() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::NotAllowed);
+        }
+
         if resp.clicked()
             && let Some(pat) = self.state.selected_pattern()
+            && let Some(pos) = resp.interact_pointer_pos()
+            && rect.contains(pos)
         {
-            let pos = resp.interact_pointer_pos().unwrap();
             let start =
                 ((pos.x - rect.left()) / self.size_per_beat * TICK_PER_BEAT as f32).floor() as u64;
             let end = start + pat.item.read().beats() * TICK_PER_BEAT;
@@ -54,9 +59,14 @@ impl<'track> PatternTrackRow<'track> {
                 painter.line_segment(
                     [emath::pos2(x, rect.top()), emath::pos2(x, rect.bottom())],
                     (
-                        match (tick % (TICK_PER_BEAT * 4), tick % TICK_PER_BEAT) {
-                            (0, _) => 0.6,
-                            (_, 0) => 0.2,
+                        match (
+                            tick % (TICK_PER_BEAT * 16),
+                            tick % (TICK_PER_BEAT * 4),
+                            tick % TICK_PER_BEAT,
+                        ) {
+                            (0, _, _) => 0.8,
+                            (_, 0, _) => 0.4,
+                            (_, _, 0) => 0.2,
                             _ => 0.1,
                         },
                         ui.style().noninteractive().fg_stroke.color,

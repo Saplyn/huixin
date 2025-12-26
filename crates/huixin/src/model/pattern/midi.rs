@@ -2,13 +2,13 @@ use std::collections::{BTreeMap, HashMap};
 
 use either::Either;
 use lyn_util::{
-    comm::{DataMap, Format, Instruction},
+    comm::{DataMap, Instruction},
     egui::LynId,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    model::{SheetMessage, state::TargetId},
+    model::{DEFAULT_SELECTABLE_COLOR, comm::SheetMessage, state::TargetId},
     routines::metronome::TICK_PER_BEAT,
 };
 
@@ -21,6 +21,7 @@ pub struct MidiPattern {
     // pattern
     pub name: String,
     pub icon: String,
+    pub color: ecolor::Color32,
     /// total ticks = beats / TICK_PER_BEAT
     pub beats: u64,
 
@@ -39,6 +40,7 @@ impl MidiPattern {
         Self {
             name: String::from("未命名"),
             icon: String::from("󰄛 "),
+            color: DEFAULT_SELECTABLE_COLOR,
             beats: 1,
             end_tick_map: BTreeMap::new(),
             notes: HashMap::new(),
@@ -183,6 +185,7 @@ impl Default for MidiPattern {
         Self {
             name: String::new(),
             icon: String::from("󰄛 "),
+            color: DEFAULT_SELECTABLE_COLOR,
             beats: 1,
             end_tick_map: BTreeMap::new(),
             notes: HashMap::new(),
@@ -197,26 +200,20 @@ impl SheetPatternTrait for MidiPattern {
     fn name_ref(&self) -> &String {
         &self.name
     }
-    #[inline]
-    fn name_mut(&mut self) -> &mut String {
-        &mut self.name
-    }
-    #[inline]
-    fn set_name(&mut self, name: String) {
-        self.name = name;
-    }
 
     #[inline]
     fn icon_ref(&self) -> &String {
         &self.icon
     }
+
     #[inline]
-    fn icon_mut(&mut self) -> &mut String {
-        &mut self.icon
+    fn color(&self) -> ecolor::Color32 {
+        self.color
     }
+
     #[inline]
-    fn set_icon(&mut self, icon: String) {
-        self.icon = icon;
+    fn usable(&self) -> bool {
+        self.target_id.is_some() && !self.tag.is_empty()
     }
 
     #[inline]
@@ -254,6 +251,7 @@ impl<'de> Deserialize<'de> for MidiPattern {
         struct MidiPatternDeser {
             name: String,
             icon: String,
+            color: ecolor::Color32,
             beats: u64,
             notes: HashMap<u64, Vec<MidiNote>>,
             tag: String,
@@ -272,6 +270,7 @@ impl<'de> Deserialize<'de> for MidiPattern {
         Ok(Self {
             name: deser.name,
             icon: deser.icon,
+            color: deser.color,
             beats: deser.beats,
             end_tick_map,
             notes: deser.notes,

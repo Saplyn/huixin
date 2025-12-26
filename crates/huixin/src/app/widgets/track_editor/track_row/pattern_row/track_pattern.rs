@@ -1,15 +1,14 @@
-use std::ops::Range;
+use std::{ops::Range, sync::Arc};
 
 use crate::{
-    app::widgets::track_editor::constants::TRACK_TIMELINE_HEIGHT,
+    app::{helpers::text_color, widgets::track_editor::constants::TRACK_TIMELINE_HEIGHT},
     model::{
         pattern::{SheetPattern, SheetPatternTrait},
-        state::{PatternId, WithId},
+        state::{CentralState, PatternId, WithId},
         track::pattern::PatternTrack,
     },
     routines::metronome::TICK_PER_BEAT,
 };
-use egui::{self, Color32, CursorIcon, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
 use lyn_util::egui::LynId;
 
 pub const RESIZE_HANDLE_WIDTH: f32 = 8.;
@@ -22,6 +21,7 @@ pub struct TrackPatternWidget<'track, 'pat> {
     range: Range<u64>,
     pattern: WithId<(LynId, PatternId), &'pat SheetPattern>,
     tick_snap: u64,
+    state: Arc<CentralState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,6 +44,7 @@ impl<'track, 'pat> TrackPatternWidget<'track, 'pat> {
         range: Range<u64>,
         pattern: WithId<(LynId, PatternId), &'pat SheetPattern>,
         tick_snap: u64,
+        state: Arc<CentralState>,
     ) -> Self {
         Self {
             size_per_beat,
@@ -51,11 +52,12 @@ impl<'track, 'pat> TrackPatternWidget<'track, 'pat> {
             range,
             pattern,
             tick_snap,
+            state,
         }
     }
 
     /// Calculate the rectangle of the pattern based on its range and size.
-    fn calc_rect(&self, anchor: egui::Pos2, range: Range<u64>) -> Rect {
+    fn calc_rect(&self, anchor: egui::Pos2, range: Range<u64>) -> egui::Rect {
         let min = egui::Pos2 {
             x: anchor.x + self.ticks_to_pixels(range.start),
             y: anchor.y,
@@ -64,7 +66,7 @@ impl<'track, 'pat> TrackPatternWidget<'track, 'pat> {
             x: anchor.x + self.ticks_to_pixels(range.end),
             y: anchor.y + TRACK_TIMELINE_HEIGHT,
         };
-        Rect::from_min_max(min, max)
+        egui::Rect::from_min_max(min, max)
     }
 
     /// Convert ticks to pixels based on the current `size_per_beat`.
@@ -87,8 +89,8 @@ impl<'track, 'pat> TrackPatternWidget<'track, 'pat> {
     }
 
     /// Determine which part of the pattern is being interacted with.
-    fn hit_test(&self, rect: Rect, pointer: egui::Pos2) -> TrackPatternDragAction {
-        let resize_handle = Rect::from_min_max(
+    fn hit_test(&self, rect: egui::Rect, pointer: egui::Pos2) -> TrackPatternDragAction {
+        let resize_handle = egui::Rect::from_min_max(
             egui::pos2(rect.max.x - RESIZE_HANDLE_WIDTH, rect.min.y),
             rect.max,
         );
@@ -104,12 +106,16 @@ impl<'track, 'pat> TrackPatternWidget<'track, 'pat> {
 // LYN: Widget Impl
 
 impl<'track, 'pat> TrackPatternWidget<'track, 'pat> {
-    pub fn show(mut self, ui: &mut Ui) {
+    pub fn show(mut self, ui: &mut egui::Ui) {
         let anchor = ui.min_rect().left_top();
         let rect = self.calc_rect(anchor, self.range.clone());
 
         let id = egui::Id::new(self.pattern.id.0);
-        let resp = ui.interact(rect, id, Sense::click_and_drag());
+        let resp = ui.interact(rect, id, egui::Sense::click_and_drag());
+
+        if resp.clicked() {
+            self.state.select_pattern(Some(self.pattern.id.1.clone()));
+        }
 
         // Right-click to delete
         if resp.secondary_clicked() {
@@ -126,10 +132,10 @@ impl<'track, 'pat> TrackPatternWidget<'track, 'pat> {
         if resp.hovered() {
             match hit_zone {
                 Some(TrackPatternDragAction::Resize) => {
-                    ui.ctx().set_cursor_icon(CursorIcon::ResizeHorizontal);
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
                 }
                 Some(TrackPatternDragAction::Move) => {
-                    ui.ctx().set_cursor_icon(CursorIcon::Grab);
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
                 }
                 None => (),
             }
@@ -148,13 +154,13 @@ impl<'track, 'pat> TrackPatternWidget<'track, 'pat> {
 
         // Handle dragging
         if resp.dragged() {
-            ui.ctx().set_cursor_icon(CursorIcon::Grabbing);
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
 
             let total_drag = ui.input(|i| {
                 i.pointer
                     .press_origin()
                     .map(|origin| i.pointer.interact_pos().unwrap_or(origin) - origin)
-                    .unwrap_or(Vec2::ZERO)
+                    .unwrap_or(egui::Vec2::ZERO)
             });
 
             let delta_ticks = self.pixels_to_ticks(total_drag.x);
@@ -195,33 +201,36 @@ impl<'track, 'pat> TrackPatternWidget<'track, 'pat> {
             let painter = ui.painter();
             let painter_rect = ui.painter_at(rect);
 
-            let pattern_color = Color32::from_rgb(100, 149, 237);
+            let mut pattern_color = self.pattern.color();
+            if !self.pattern.usable() {
+                pattern_color = pattern_color.linear_multiply(0.3);
+            }
             let stroke_color = if resp.hovered() || resp.dragged() {
-                Color32::WHITE
+                ecolor::Color32::WHITE
             } else {
-                Color32::from_rgb(70, 100, 170)
+                pattern_color.lerp_to_gamma(ecolor::Color32::BLACK, 0.5)
             };
 
             painter.rect(
                 rect,
                 4.0,
                 pattern_color,
-                Stroke::new(1.5, stroke_color),
-                StrokeKind::Middle,
+                egui::Stroke::new(1.5, stroke_color),
+                egui::StrokeKind::Middle,
             );
             painter_rect.text(
                 rect.center_top() - egui::vec2(0.0, -10.0),
                 egui::Align2::CENTER_CENTER,
                 self.pattern.item.name_ref(),
                 egui::FontId::default(),
-                Color32::WHITE,
+                text_color(pattern_color),
             );
 
             // Draw resize handles on hover
             if resp.hovered() {
-                let handle_color = Color32::from_rgba_unmultiplied(255, 255, 255, 100);
+                let handle_color = ecolor::Color32::from_rgba_unmultiplied(255, 255, 255, 100);
 
-                let resize_handle_rect = Rect::from_min_max(
+                let resize_handle_rect = egui::Rect::from_min_max(
                     egui::pos2(rect.max.x - RESIZE_HANDLE_WIDTH, rect.min.y),
                     rect.max,
                 );

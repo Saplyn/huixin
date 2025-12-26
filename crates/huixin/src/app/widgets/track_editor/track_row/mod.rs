@@ -47,6 +47,7 @@ impl<'track> TrackRow<'track> {
                         range,
                         WithId::new((pat_ui_id, pat_id), &pat),
                         TICK_PER_BEAT / 4,
+                        self.state.clone(),
                     )
                     .show(ui);
                 }

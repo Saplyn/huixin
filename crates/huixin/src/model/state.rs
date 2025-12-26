@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     app::PlayerContext,
     model::{
-        CommTarget,
+        comm::CommTarget,
         pattern::{SheetPattern, SheetPatternTrait, SheetPatternType, midi::MidiPattern},
         track::{SheetTrack, SheetTrackType, pattern::PatternTrack},
     },

@@ -6,7 +6,10 @@ use std::{
 
 use log::{info, warn};
 
-use crate::{model::SheetMessage, model::state::CentralState};
+use crate::model::{
+    comm::{CommTarget, SheetMessage},
+    state::CentralState,
+};
 
 const NO_MSG_CHECK_HEALTH_INTERVAL: Duration = Duration::from_millis(50);
 
@@ -22,26 +25,23 @@ pub fn main(state: Arc<CentralState>, msg_rx: mpsc::Receiver<SheetMessage>) -> !
             };
             let entry = entry.clone();
             state.worker_spawn_task(move || {
-                // TODO: should I use `try_write()`
-                let mut guard = entry.write();
+                let guard = entry.read();
+                let (addr, format) = (guard.addr.clone(), guard.format);
                 if guard.stream.is_none() {
-                    guard.connect_stream();
+                    drop(guard);
+                    let stream = CommTarget::connect_stream_blocking(addr.as_str(), format);
+                    entry.write().stream = stream;
                     return;
                 }
-                let format = guard.format;
-                if let Err(err) = guard.stream.as_mut().unwrap().send(
-                    dbg!(
-                        msg.payload
-                            .form_string(format)
-                            .expect("Failed to serialize instruction payload")
-                    )
-                    .into(),
+                if let Err(err) = entry.write().stream.as_mut().unwrap().send(
+                    msg.payload
+                        .form_string(format)
+                        .expect("Failed to serialize instruction payload")
+                        .into(),
                 ) {
-                    warn!(
-                        "Failed to send insturction payload to {}: {err}",
-                        guard.addr
-                    );
-                    guard.connect_stream();
+                    warn!("Failed to send insturction payload to {}: {err}", addr);
+                    let stream = CommTarget::connect_stream_blocking(addr.as_str(), format);
+                    entry.write().stream = stream;
                 }
             });
             continue;
@@ -55,8 +55,12 @@ pub fn main(state: Arc<CentralState>, msg_rx: mpsc::Receiver<SheetMessage>) -> !
             {
                 let target_entry = target_entry.clone();
                 state.worker_spawn_task(move || {
-                    let mut guard = target_entry.write();
-                    guard.connect_stream();
+                    let (addr, format) = {
+                        let guard = target_entry.read();
+                        (guard.addr.clone(), guard.format)
+                    };
+                    let stream = CommTarget::connect_stream_blocking(addr.as_str(), format);
+                    target_entry.write().stream = stream;
                 });
             }
         }

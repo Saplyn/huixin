@@ -1,6 +1,5 @@
 use std::{fmt::Display, ops};
 
-use egui::IntoAtoms;
 use osc::{OscMessage, OscPacket};
 use serde::{Deserialize, Serialize};
 
@@ -69,10 +68,13 @@ impl Instruction {
             })
             .collect::<Vec<osc::OscType>>();
 
-        OscPacket::Message(OscMessage {
-            addr: self.tag,
-            args,
-        })
+        let addr = if self.tag.starts_with('/') {
+            self.tag
+        } else {
+            format!("/{}", self.tag)
+        };
+
+        OscPacket::Message(OscMessage { addr, args })
     }
 }
 

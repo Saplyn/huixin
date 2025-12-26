@@ -9,7 +9,7 @@ use log::info;
 use crate::{
     app::PlayerContext,
     model::{
-        SheetMessage, pattern::SheetPatternTrait, state::CentralState, track::SheetTrackTrait,
+        comm::SheetMessage, pattern::SheetPatternTrait, state::CentralState, track::SheetTrackTrait,
     },
     routines::RoutineId,
 };

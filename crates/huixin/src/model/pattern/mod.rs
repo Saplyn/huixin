@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::model::SheetMessage;
+use crate::model::comm::SheetMessage;
 
 use self::midi::MidiPattern;
 
@@ -24,12 +24,9 @@ pub enum SheetPattern {
 
 pub trait SheetPatternTrait {
     fn name_ref(&self) -> &String;
-    fn name_mut(&mut self) -> &mut String;
-    fn set_name(&mut self, name: String);
-
     fn icon_ref(&self) -> &String;
-    fn icon_mut(&mut self) -> &mut String;
-    fn set_icon(&mut self, icon: String);
+    fn color(&self) -> ecolor::Color32;
+    fn usable(&self) -> bool;
 
     fn beats(&self) -> u64;
     fn msg_at(&self, tick: u64) -> Vec<SheetMessage>;
@@ -42,18 +39,6 @@ impl SheetPatternTrait for SheetPattern {
             Self::Midi(pat) => pat.name_ref(),
         }
     }
-    #[inline]
-    fn name_mut(&mut self) -> &mut String {
-        match self {
-            Self::Midi(pat) => pat.name_mut(),
-        }
-    }
-    #[inline]
-    fn set_name(&mut self, name: String) {
-        match self {
-            Self::Midi(pat) => pat.set_name(name),
-        }
-    }
 
     #[inline]
     fn icon_ref(&self) -> &String {
@@ -61,16 +46,18 @@ impl SheetPatternTrait for SheetPattern {
             Self::Midi(pat) => pat.icon_ref(),
         }
     }
+
     #[inline]
-    fn icon_mut(&mut self) -> &mut String {
+    fn color(&self) -> ecolor::Color32 {
         match self {
-            Self::Midi(pat) => pat.icon_mut(),
+            Self::Midi(pat) => pat.color(),
         }
     }
+
     #[inline]
-    fn set_icon(&mut self, icon: String) {
+    fn usable(&self) -> bool {
         match self {
-            Self::Midi(pat) => pat.set_icon(icon),
+            Self::Midi(pat) => pat.usable(),
         }
     }
 

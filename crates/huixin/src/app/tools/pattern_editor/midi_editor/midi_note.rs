@@ -182,11 +182,11 @@ impl<'pat> MidiNoteWidget<'pat> {
         if ui.is_rect_visible(rect) {
             let painter = ui.painter();
 
-            let note_color = ecolor::Color32::from_rgb(100, 149, 237);
+            let note_color = self.pattern.color;
             let stroke_color = if resp.hovered() || resp.dragged() {
                 ecolor::Color32::WHITE
             } else {
-                ecolor::Color32::from_rgb(70, 100, 170)
+                note_color.lerp_to_gamma(ecolor::Color32::BLACK, 0.5)
             };
 
             painter.rect(
@@ -198,8 +198,7 @@ impl<'pat> MidiNoteWidget<'pat> {
             );
 
             if resp.hovered() {
-                let handle_color = ecolor::Color32::from_rgba_unmultiplied(255, 255, 255, 100);
-
+                let handle_color = ecolor::Color32::from_rgba_unmultiplied(255, 255, 255, 128);
                 let right_handle_rect = egui::Rect::from_min_max(
                     egui::pos2(rect.max.x - RESIZE_HANDLE_WIDTH, rect.min.y),
                     rect.max,

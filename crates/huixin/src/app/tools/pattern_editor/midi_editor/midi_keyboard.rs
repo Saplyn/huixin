@@ -8,6 +8,9 @@ use super::constants::{
 pub struct MidiKeyboard;
 
 impl MidiKeyboard {
+    pub const WHITE_KEY_COLOR: ecolor::Color32 = ecolor::Color32::WHITE;
+    pub const BLACK_KEY_COLOR: ecolor::Color32 = ecolor::Color32::BLACK;
+
     pub fn show(self, ui: &mut egui::Ui) {
         let desired_size = emath::vec2(KEY_ROW_WIDTH, NUMBER_OF_KEYS as f32 * KEY_ROW_HEIGHT);
         let (rect, resp) = ui.allocate_exact_size(desired_size, egui::Sense::all());
@@ -32,7 +35,7 @@ impl MidiKeyboard {
                     emath::pos2(rect.left(), y),
                     emath::vec2(rect.width(), height),
                 );
-                painter.rect_filled(key_rect, 0.0, ecolor::Color32::WHITE);
+                painter.rect_filled(key_rect, 0.0, Self::WHITE_KEY_COLOR);
                 painter.rect_stroke(
                     key_rect,
                     0.0,
@@ -64,7 +67,7 @@ impl MidiKeyboard {
                     emath::pos2(rect.left(), y),
                     emath::vec2(rect.width() * BLACK_KEY_WIDTH_SCALE, KEY_ROW_HEIGHT),
                 );
-                painter.rect_filled(key_rect, 0.0, ecolor::Color32::BLACK);
+                painter.rect_filled(key_rect, 0.0, Self::BLACK_KEY_COLOR);
                 painter.rect_stroke(
                     key_rect,
                     0.0,

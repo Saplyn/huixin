@@ -19,7 +19,7 @@ use self::{
 };
 use crate::{
     APP_ID,
-    app::{tools::ToolWindowId, widgets::track_editor::TrackEditor},
+    app::{helpers::text_color, tools::ToolWindowId, widgets::track_editor::TrackEditor},
     model::{
         pattern::{SheetPatternTrait, SheetPatternType},
         persistence::{AppStorage, WorkingDirectory},
@@ -131,7 +131,12 @@ impl MainApp {
         if state_file.exists() {
             match fs::read_to_string(&state_file) {
                 Ok(str) => {
-                    self.state.sheet_from_json_str(&str);
+                    if let Err(e) = self.state.sheet_from_json_str(&str) {
+                        warn!(
+                            "Failed to restore persisted state from file {:?}: {}",
+                            state_file, e
+                        );
+                    };
                 }
                 Err(e) => {
                     warn!(
@@ -396,16 +401,6 @@ impl MainApp {
         if ui
             .add_sized(
                 [ui.available_width(), 30.],
-                egui::Button::new(egui::RichText::new("添加轨道")),
-            )
-            .clicked()
-        {
-            self.state.sheet_add_track(SheetTrackType::Pattern);
-        };
-
-        if ui
-            .add_sized(
-                [ui.available_width(), 30.],
                 egui::Button::new(egui::RichText::new("添加片段")),
             )
             .clicked()
@@ -416,39 +411,47 @@ impl MainApp {
         egui::ScrollArea::vertical().show(ui, |ui| {
             let mut to_be_removed = Vec::new();
             for entry in self.state.sheet_patterns_iter() {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                let guard = entry.value().read();
+                ui.horizontal(|ui| {
                     ui.style_mut().spacing.item_spacing = emath::vec2(4., 0.);
-                    if ui.button(" ").clicked() {
-                        to_be_removed.push(entry.key().clone());
-                    }
-
-                    let pat_button = ui.add_sized(
-                        [ui.available_width(), 0.],
-                        egui::Button::new(format!(
-                            "{} {}",
-                            entry.value().read().icon_ref(),
-                            entry.value().read().name_ref()
-                        ))
-                        .right_text("")
-                        .selected(
-                            self.state
-                                .selected_pattern_id()
-                                .as_ref()
-                                .is_some_and(|pat| pat == entry.key()),
+                    let icon_button = ui.add(
+                        egui::Button::new(
+                            egui::RichText::new(guard.icon_ref())
+                                .color(guard.color().lerp_to_gamma(text_color(guard.color()), 0.6))
+                                .heading(),
                         )
-                        .frame_when_inactive(true),
+                        .fill(guard.color()),
                     );
-                    if pat_button.clicked() {
-                        self.state.select_pattern(Some(entry.key().clone()));
-                    };
-                    if pat_button.double_clicked() {
-                        *self
-                            .tools
-                            .iter_mut()
-                            .find(|tool| tool.tool_id() == ToolWindowId::PatternEditor)
-                            .unwrap()
-                            .window_open_mut() = true;
-                    };
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                        if ui.button(egui::RichText::new(" ").heading()).clicked() {
+                            to_be_removed.push(entry.key().clone());
+                        }
+
+                        let pat_button = ui.add_sized(
+                            ui.available_size(),
+                            egui::Button::new(guard.name_ref())
+                                .right_text("")
+                                .selected(
+                                    self.state
+                                        .selected_pattern_id()
+                                        .as_ref()
+                                        .is_some_and(|pat| pat == entry.key()),
+                                )
+                                .frame_when_inactive(true),
+                        );
+                        if pat_button.clicked() || icon_button.clicked() {
+                            self.state.select_pattern(Some(entry.key().clone()));
+                        };
+                        if pat_button.double_clicked() || icon_button.double_clicked() {
+                            *self
+                                .tools
+                                .iter_mut()
+                                .find(|tool| tool.tool_id() == ToolWindowId::PatternEditor)
+                                .unwrap()
+                                .window_open_mut() = true;
+                        };
+                    });
                 });
             }
             for pat_id in to_be_removed {
