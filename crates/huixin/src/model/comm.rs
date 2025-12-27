@@ -1,11 +1,8 @@
-use std::{
-    io::Write,
-    net::{SocketAddr, TcpStream},
-    time::Duration,
-};
+use std::net::TcpStream;
 
 use lyn_util::comm::{Format, Instruction};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use ws::WebSocket;
 
 use crate::model::{DEFAULT_COMM_TARGET_ADDR, state::TargetId};
@@ -22,56 +19,21 @@ pub enum CommStream {
     TcpStream(TcpStream),
 }
 
-impl CommStream {
-    pub fn send(&mut self, data: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
-        match self {
-            CommStream::WebSocket(ws) => ws.send(data.into())?,
-            CommStream::TcpStream(stream) => stream.write_all(&data)?,
-        }
-        Ok(())
-    }
+#[derive(Debug, Error)]
+pub enum CommStreamErr {
+    #[error("{0}")]
+    WebSocket(#[from] ws::Error),
+    #[error("{0}")]
+    Std(#[from] std::io::Error),
+    #[error("No communication stream connected")]
+    NoCommStream,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CommTarget {
     pub name: String,
     pub addr: String,
     pub format: Format,
-    #[serde(skip_serializing)]
-    pub stream: Option<CommStream>,
-}
-
-impl CommTarget {
-    pub fn connect_stream_blocking(addr: &str, format: Format) -> Option<CommStream> {
-        let addr: SocketAddr = addr.parse().ok()?;
-        let timeout = Duration::from_secs(3);
-
-        match format {
-            Format::WsBasedJson => {
-                let tcp_stream = TcpStream::connect_timeout(&addr, timeout).ok()?;
-                tcp_stream.set_read_timeout(Some(timeout)).ok()?;
-                tcp_stream.set_write_timeout(Some(timeout)).ok()?;
-
-                let (ws, _) = ws::client(format!("ws://{}", addr), tcp_stream).ok()?;
-                Some(CommStream::WebSocket(Box::new(ws)))
-            }
-            Format::TcpBasedOsc => {
-                let stream = TcpStream::connect_timeout(&addr, timeout).ok()?;
-                Some(CommStream::TcpStream(stream))
-            }
-        }
-    }
-}
-
-impl Clone for CommTarget {
-    fn clone(&self) -> Self {
-        Self {
-            name: self.name.clone(),
-            addr: self.addr.clone(),
-            format: self.format,
-            stream: None,
-        }
-    }
 }
 
 impl Default for CommTarget {
@@ -80,7 +42,6 @@ impl Default for CommTarget {
             name: "未命名".to_string(),
             addr: DEFAULT_COMM_TARGET_ADDR.to_string(),
             format: Format::default(),
-            stream: None,
         }
     }
 }
@@ -101,7 +62,6 @@ impl<'de> Deserialize<'de> for CommTarget {
             name: deser.name,
             addr: deser.addr,
             format: deser.format,
-            stream: None,
         })
     }
 }

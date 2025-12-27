@@ -33,3 +33,4 @@ toml = { workspace = true, features = ["default"] }
 # Misc
 either = "1.15"
 lyn-util = { workspace = true }
+thiserror = "2.0"

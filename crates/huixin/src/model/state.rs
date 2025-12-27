@@ -1,7 +1,15 @@
-use std::{num::NonZero, ops, sync::Arc};
+use std::{
+    io::Write,
+    net::{SocketAddr, TcpStream},
+    num::NonZero,
+    ops,
+    sync::Arc,
+    time::Duration,
+};
 
-use dashmap::DashMap;
-use lyn_util::egui::LynId;
+use dashmap::{DashMap, DashSet, mapref::one::Ref};
+use log::trace;
+use lyn_util::{comm::Format, egui::LynId};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use serde::{Deserialize, Serialize};
@@ -9,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     app::PlayerContext,
     model::{
-        comm::CommTarget,
+        comm::{CommStream, CommStreamErr, CommTarget},
         pattern::{SheetPattern, SheetPatternTrait, SheetPatternType, midi::MidiPattern},
         track::{SheetTrack, SheetTrackType, pattern::PatternTrack},
     },
@@ -62,6 +70,8 @@ impl<I, T> ops::DerefMut for WithId<I, T> {
     }
 }
 
+// LYN: Central State Holder
+
 #[derive(Debug)]
 pub struct CentralState {
     workers: ThreadPool,
@@ -80,6 +90,9 @@ pub struct UiState {
 impl UiState {
     pub const MIN_SIZE_PER_BEAT: f32 = 40.;
     pub const MAX_SIZE_PER_BEAT: f32 = 400.;
+
+    pub const STORAGE_KEY_TRACK_SPB: &str = "track-size-per-beat";
+    pub const STORAGE_KEY_PATTERN_SPB: &str = "pattern-size-per-beat";
 }
 
 #[derive(Debug)]
@@ -87,6 +100,8 @@ pub struct App {
     err_modal_message: RwLock<Option<String>>,
     selected_pattern: RwLock<Option<PatternId>>,
     player_context: RwLock<PlayerContext>,
+    comm_stream: DashMap<TargetId, CommStream>,
+    comm_stream_connecting: DashSet<TargetId>,
 }
 
 #[derive(Debug)]
@@ -112,6 +127,8 @@ impl CentralState {
             err_modal_message: RwLock::new(None),
             selected_pattern: RwLock::new(None),
             player_context: RwLock::new(PlayerContext::Sheet),
+            comm_stream: DashMap::new(),
+            comm_stream_connecting: DashSet::new(),
         };
         let ui = UiState {
             track_editor_size_per_beat: RwLock::new(UiState::MIN_SIZE_PER_BEAT),
@@ -164,11 +181,84 @@ impl CentralState {
     pub fn worker_spawn_task(&self, f: impl FnOnce() + Send + 'static) {
         self.workers.spawn(f);
     }
-    pub fn set_err_msg(&self, msg: Option<String>) {
+    pub fn app_set_err_msg(&self, msg: Option<String>) {
         *self.app.err_modal_message.write() = msg;
     }
-    pub fn get_err_msg(&self) -> RwLockReadGuard<'_, Option<String>> {
+    pub fn app_get_err_msg(&self) -> RwLockReadGuard<'_, Option<String>> {
         self.app.err_modal_message.read()
+    }
+    pub fn comm_stream_exists(&self, id: &TargetId) -> bool {
+        self.app.comm_stream.try_get(id).is_present()
+    }
+    pub fn comm_get_stream(&self, id: &TargetId) -> Option<Ref<'_, TargetId, CommStream>> {
+        self.app.comm_stream.get(id)
+    }
+    pub fn comm_drop_stream(&self, id: &TargetId) {
+        self.app.comm_stream.remove(id);
+    }
+    pub fn comm_connect_stream_blocking(
+        &self,
+        id: TargetId,
+        addr: &str,
+        format: Format,
+    ) -> Option<Ref<'_, TargetId, CommStream>> {
+        if self.app.comm_stream_connecting.get(&id).is_some() {
+            return None;
+        }
+        self.app.comm_stream_connecting.insert(id.clone());
+
+        struct Guard<'state, 'id> {
+            state: &'state CentralState,
+            id: &'id TargetId,
+        }
+        impl<'state, 'id> Drop for Guard<'state, 'id> {
+            fn drop(&mut self) {
+                self.state.app.comm_stream_connecting.remove(self.id);
+            }
+        }
+
+        let _guard = Guard {
+            state: self,
+            id: &id,
+        };
+        let addr: SocketAddr = addr.parse().ok()?;
+        let timeout = Duration::from_secs(3);
+
+        self.app.comm_stream.get(&id);
+        trace!("old comm stream removed");
+        let stream = match format {
+            Format::WsBasedJson => {
+                let tcp_stream = TcpStream::connect_timeout(&addr, timeout).ok()?;
+                tcp_stream.set_read_timeout(Some(timeout)).ok()?;
+                tcp_stream.set_write_timeout(Some(timeout)).ok()?;
+
+                trace!("trying to connect (websocket)");
+                let (ws, _) = ws::client(format!("ws://{}", addr), tcp_stream).ok()?;
+                CommStream::WebSocket(Box::new(ws))
+            }
+            Format::TcpBasedOsc => {
+                trace!("trying to connect (tcp)");
+                let stream = TcpStream::connect_timeout(&addr, timeout).ok()?;
+                CommStream::TcpStream(stream)
+            }
+        };
+        self.app.comm_stream.insert(id.clone(), stream);
+        trace!("new comm stream inserted");
+        self.app.comm_stream.get(&id)
+    }
+    pub fn comm_send_data_blocking(
+        &self,
+        id: &TargetId,
+        data: Vec<u8>,
+    ) -> Result<(), CommStreamErr> {
+        let Some(mut entry) = self.app.comm_stream.get_mut(id) else {
+            return Err(CommStreamErr::NoCommStream);
+        };
+        match entry.value_mut() {
+            CommStream::WebSocket(ws) => ws.send(data.into())?,
+            CommStream::TcpStream(stream) => stream.write_all(&data)?,
+        }
+        Ok(())
     }
 }
 

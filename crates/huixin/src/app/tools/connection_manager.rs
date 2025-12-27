@@ -63,9 +63,15 @@ impl ToolWindow for ConnectionManager {
                         .show(ui, |ui| {
                             let mut to_be_removed = Vec::new();
                             for entry in self.state.sheet_comm_targets_iter() {
-                                let mut guard = entry.write();
+                                let Some(mut guard) = entry.try_write() else {
+                                    ui.horizontal(|ui| {
+                                        ui.label("editing");
+                                    });
+                                    continue;
+                                };
                                 ui.horizontal(|ui| {
-                                    ui.label(if guard.stream.is_some() {
+                                    let id = entry.key().clone();
+                                    ui.label(if self.state.comm_stream_exists(&id) {
                                         egui::RichText::new(" ")
                                     } else {
                                         egui::RichText::new(" ").color(ecolor::Color32::RED)
@@ -74,31 +80,30 @@ impl ToolWindow for ConnectionManager {
                                         [80., ui.available_height()],
                                         egui::TextEdit::singleline(&mut guard.name),
                                     );
-                                    if ui
-                                        .add_sized(
-                                            [140., ui.available_height()],
-                                            egui::TextEdit::singleline(&mut guard.addr),
-                                        )
-                                        .changed()
-                                    {
-                                        guard.stream = None;
-                                    }
-                                    egui::ComboBox::new(entry.key(), "")
+                                    let addr_resp = ui.add_sized(
+                                        [140., ui.available_height()],
+                                        egui::TextEdit::singleline(&mut guard.addr),
+                                    );
+                                    let format_changed = egui::ComboBox::new(entry.key(), "")
                                         .selected_text(guard.format.to_string())
                                         .show_ui(ui, |ui| {
+                                            let mut changed = false;
                                             for format in lyn_util::comm::Format::variants() {
-                                                if ui
+                                                changed |= ui
                                                     .selectable_value(
                                                         &mut guard.format,
                                                         *format,
                                                         format.to_string(),
                                                     )
-                                                    .clicked()
-                                                {
-                                                    guard.stream = None;
-                                                }
+                                                    .clicked();
                                             }
-                                        });
+                                            changed
+                                        })
+                                        .inner;
+                                    if addr_resp.changed() || format_changed.is_some_and(|v| v) {
+                                        self.state.comm_drop_stream(&id);
+                                    }
+
                                     if ui.button(" ").clicked() {
                                         to_be_removed.push(entry.key().clone());
                                     }
@@ -106,6 +111,7 @@ impl ToolWindow for ConnectionManager {
                             }
                             for id in to_be_removed {
                                 self.state.sheet_del_comm_target(&id);
+                                self.state.comm_drop_stream(&id);
                             }
                             if ui.button("新增通讯目标").clicked() {
                                 self.state.sheet_add_comm_target();

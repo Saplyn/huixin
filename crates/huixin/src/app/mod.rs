@@ -23,7 +23,7 @@ use crate::{
     model::{
         pattern::{SheetPatternTrait, SheetPatternType},
         persistence::{AppStorage, WorkingDirectory},
-        state::CentralState,
+        state::{CentralState, UiState},
         track::SheetTrackType,
     },
     routines::{RoutineId, guardian, instructor, metronome, sheet_reader},
@@ -164,6 +164,12 @@ impl MainApp {
             let open = eframe::get_value(storage, &key).unwrap_or_default();
             *tool.window_open_mut() = open;
         }
+        *self.state.ui.track_editor_size_per_beat.write() =
+            eframe::get_value(storage, &AppStorage::key(UiState::STORAGE_KEY_TRACK_SPB))
+                .unwrap_or(UiState::MIN_SIZE_PER_BEAT);
+        *self.state.ui.pattern_editor_size_per_beat.write() =
+            eframe::get_value(storage, &AppStorage::key(UiState::STORAGE_KEY_PATTERN_SPB))
+                .unwrap_or(UiState::MIN_SIZE_PER_BEAT);
     }
 }
 
@@ -190,14 +196,18 @@ impl eframe::App for MainApp {
             self.persist_sheet();
         }
 
-        if let Some(msg) = self.state.get_err_msg().as_ref() {
+        if let Some(msg) = self.state.app_get_err_msg().as_ref() {
             ErrorModal::new(msg).draw(ctx);
         }
         ctx.request_repaint(); // Uncomment this for continuous repainting (fix some UI update issues)
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, Self::STORAGE_KEY_CWD, &self.working_directory);
+        eframe::set_value(
+            storage,
+            &AppStorage::key(Self::STORAGE_KEY_CWD),
+            &self.working_directory,
+        );
         for tool in self.tools.iter() {
             eframe::set_value(
                 storage,
@@ -205,6 +215,16 @@ impl eframe::App for MainApp {
                 &tool.window_open(),
             );
         }
+        eframe::set_value(
+            storage,
+            &AppStorage::key(UiState::STORAGE_KEY_TRACK_SPB),
+            &self.state.ui.track_editor_size_per_beat,
+        );
+        eframe::set_value(
+            storage,
+            &AppStorage::key(UiState::STORAGE_KEY_PATTERN_SPB),
+            &self.state.ui.pattern_editor_size_per_beat,
+        );
     }
 
     fn auto_save_interval(&self) -> Duration {

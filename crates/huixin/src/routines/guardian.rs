@@ -16,7 +16,7 @@ pub fn main(state: Arc<CentralState>, routines: Vec<(RoutineId, JoinHandle<()>)>
             if !routine.is_finished() {
                 continue;
             }
-            state.set_err_msg(Some(format!("常驻线程 {id:?} 意外崩溃")));
+            state.app_set_err_msg(Some(format!("常驻线程 {id:?} 意外崩溃")));
         }
         thread::sleep(CHECK_HEALTH_POLL_INTERVAL);
     }

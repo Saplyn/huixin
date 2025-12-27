@@ -6,10 +6,7 @@ use std::{
 
 use log::{info, warn};
 
-use crate::model::{
-    comm::{CommTarget, SheetMessage},
-    state::CentralState,
-};
+use crate::model::{comm::SheetMessage, state::CentralState};
 
 const NO_MSG_CHECK_HEALTH_INTERVAL: Duration = Duration::from_millis(50);
 
@@ -24,43 +21,45 @@ pub fn main(state: Arc<CentralState>, msg_rx: mpsc::Receiver<SheetMessage>) -> !
                 continue;
             };
             let entry = entry.clone();
-            state.worker_spawn_task(move || {
-                let guard = entry.read();
-                let (addr, format) = (guard.addr.clone(), guard.format);
-                if guard.stream.is_none() {
-                    drop(guard);
-                    let stream = CommTarget::connect_stream_blocking(addr.as_str(), format);
-                    entry.write().stream = stream;
-                    return;
-                }
-                if let Err(err) = entry.write().stream.as_mut().unwrap().send(
-                    msg.payload
+            state.worker_spawn_task({
+                let state = state.clone();
+                move || {
+                    let (id, addr, format) = {
+                        let guard = entry.read();
+                        (msg.target_id.clone(), guard.addr.clone(), guard.format)
+                    };
+                    if state.comm_get_stream(&id).is_none() {
+                        state.comm_connect_stream_blocking(id, &addr, format);
+                        return;
+                    }
+                    let data = msg
+                        .payload
                         .form_string(format)
                         .expect("Failed to serialize instruction payload")
-                        .into(),
-                ) {
-                    warn!("Failed to send insturction payload to {}: {err}", addr);
-                    let stream = CommTarget::connect_stream_blocking(addr.as_str(), format);
-                    entry.write().stream = stream;
+                        .into();
+                    if let Err(err) = state.comm_send_data_blocking(&id, data) {
+                        warn!("Failed to send insturction payload to {}: {err}", addr);
+                        state.comm_connect_stream_blocking(id, &addr, format);
+                    }
                 }
             });
             continue;
         }
 
         // check target health
-        for target_entry in state.sheet_comm_targets_iter() {
-            if target_entry
-                .try_read()
-                .is_some_and(|guard| guard.stream.is_none())
-            {
-                let target_entry = target_entry.clone();
-                state.worker_spawn_task(move || {
-                    let (addr, format) = {
-                        let guard = target_entry.read();
-                        (guard.addr.clone(), guard.format)
-                    };
-                    let stream = CommTarget::connect_stream_blocking(addr.as_str(), format);
-                    target_entry.write().stream = stream;
+        for entry in state.sheet_comm_targets_iter() {
+            let id = entry.key().clone();
+            if state.comm_get_stream(&id).is_none() {
+                let target_entry = entry.clone();
+                state.worker_spawn_task({
+                    let state = state.clone();
+                    move || {
+                        let (addr, format) = {
+                            let guard = target_entry.read();
+                            (guard.addr.clone(), guard.format)
+                        };
+                        state.comm_connect_stream_blocking(id, &addr, format);
+                    }
                 });
             }
         }

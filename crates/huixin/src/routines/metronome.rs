@@ -48,7 +48,6 @@ pub fn main(state: Arc<CentralState>) -> ! {
                 top_tick if *curr_tick_guard >= top_tick => *curr_tick_guard = 0,
                 _ => *curr_tick_guard = curr_tick_guard.saturating_add(1),
             }
-            trace!("{}/{:?}", *curr_tick_guard, limit);
         }
     }
 }

@@ -133,7 +133,7 @@ impl Serialize for PatternTrack {
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("PatternTrack", 2)?;
+        let mut state = serializer.serialize_struct("PatternTrack", 4)?;
         state.serialize_field("name", &self.name)?;
         state.serialize_field("icon", &self.icon)?;
         state.serialize_field("color", &self.color)?;
