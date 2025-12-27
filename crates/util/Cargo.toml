@@ -16,4 +16,4 @@ json = { workspace = true, features = ["default"] }
 toml = { workspace = true, features = ["default"] }
 osc = { workspace = true, features = ["default"] }
 # Misc
-rand = "0.10.0-rc.5"
+rand = "0.9"
