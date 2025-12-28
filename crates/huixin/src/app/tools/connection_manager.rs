@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use egui_dnd::dnd;
 use lyn_util::egui::LynId;
 use parking_lot::RwLock;
 
@@ -62,52 +63,74 @@ impl ToolWindow for ConnectionManager {
                         .inner_margin(ui.style().spacing.item_spacing)
                         .show(ui, |ui| {
                             let mut to_be_removed = Vec::new();
-                            for entry in self.state.sheet_comm_targets_iter() {
-                                let Some(mut guard) = entry.try_write() else {
-                                    ui.horizontal(|ui| {
-                                        ui.label("editing");
-                                    });
-                                    continue;
-                                };
-                                ui.horizontal(|ui| {
-                                    let id = entry.key().clone();
-                                    ui.label(if self.state.comm_stream_exists(&id) {
-                                        egui::RichText::new(" ")
-                                    } else {
-                                        egui::RichText::new(" ").color(ecolor::Color32::RED)
-                                    });
-                                    ui.add_sized(
-                                        [80., ui.available_height()],
-                                        egui::TextEdit::singleline(&mut guard.name),
-                                    );
-                                    let addr_resp = ui.add_sized(
-                                        [140., ui.available_height()],
-                                        egui::TextEdit::singleline(&mut guard.addr),
-                                    );
-                                    let format_changed = egui::ComboBox::new(entry.key(), "")
-                                        .selected_text(guard.format.to_string())
-                                        .show_ui(ui, |ui| {
-                                            let mut changed = false;
-                                            for format in lyn_util::comm::Format::variants() {
-                                                changed |= ui
-                                                    .selectable_value(
-                                                        &mut guard.format,
-                                                        *format,
-                                                        format.to_string(),
-                                                    )
-                                                    .clicked();
-                                            }
-                                            changed
-                                        })
-                                        .inner;
-                                    if addr_resp.changed() || format_changed.is_some_and(|v| v) {
-                                        self.state.comm_drop_stream(&id);
-                                    }
 
-                                    if ui.button(" ").clicked() {
-                                        to_be_removed.push(entry.key().clone());
-                                    }
-                                });
+                            let mut ordering_id_to_be_removed = Vec::new();
+                            dnd(ui, WidgetId::ConnectionManagerTargetsOrderingDnd).show_vec(
+                                &mut self.state.ui.targets_ordering_in_id.write(),
+                                |ui, id, handle, state| {
+                                    let Some(arc) = self.state.sheet_get_comm_target(id) else {
+                                        ordering_id_to_be_removed.push(id.clone());
+                                        return;
+                                    };
+                                    let Some(mut guard) = arc.try_write() else {
+                                        ui.horizontal(|ui| {
+                                            // TODO: better locking indication
+                                            ui.label("editing");
+                                        });
+                                        return;
+                                    };
+                                    ui.horizontal(|ui| {
+                                        handle.ui(ui, |ui| {
+                                            ui.label(egui::RichText::new("󰇝").heading());
+                                        });
+
+                                        let target_id = id.clone();
+                                        ui.label(if self.state.comm_stream_exists(&target_id) {
+                                            egui::RichText::new(" ")
+                                        } else {
+                                            egui::RichText::new(" ").color(ecolor::Color32::RED)
+                                        });
+                                        ui.add_sized(
+                                            [80., ui.available_height()],
+                                            egui::TextEdit::singleline(&mut guard.name),
+                                        );
+                                        let addr_resp = ui.add_sized(
+                                            [140., ui.available_height()],
+                                            egui::TextEdit::singleline(&mut guard.addr),
+                                        );
+                                        let format_changed = egui::ComboBox::new(&target_id, "")
+                                            .selected_text(guard.format.to_string())
+                                            .show_ui(ui, |ui| {
+                                                let mut changed = false;
+                                                for format in lyn_util::comm::Format::variants() {
+                                                    changed |= ui
+                                                        .selectable_value(
+                                                            &mut guard.format,
+                                                            *format,
+                                                            format.to_string(),
+                                                        )
+                                                        .clicked();
+                                                }
+                                                changed
+                                            })
+                                            .inner;
+                                        if addr_resp.changed() || format_changed.is_some_and(|v| v)
+                                        {
+                                            self.state.comm_drop_stream(&target_id);
+                                        }
+
+                                        if ui.button(" ").clicked() {
+                                            to_be_removed.push(target_id.clone());
+                                        }
+                                    });
+                                },
+                            );
+                            for id in ordering_id_to_be_removed {
+                                self.state
+                                    .ui
+                                    .targets_ordering_in_id
+                                    .write()
+                                    .retain(|x| x != &id);
                             }
                             for id in to_be_removed {
                                 self.state.sheet_del_comm_target(&id);

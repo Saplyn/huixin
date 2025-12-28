@@ -7,6 +7,7 @@ pub enum WidgetId {
     MainAppTopToolBar,
     MainAppButtonStatusBar,
     MainAppLeftExplorerPanel,
+    MainAppExplorerPatternsOrderingDnd,
 
     ErrorModal,
 
@@ -21,8 +22,10 @@ pub enum WidgetId {
     PatternEditorMidiComboBoxCommTarget,
 
     ConnectionManager,
+    ConnectionManagerTargetsOrderingDnd,
 
     TrackEditorTopPanel,
+    TrackEditorHeaderOrderingDnd,
 }
 
 impl From<WidgetId> for egui::Id {

@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use egui_dnd::dnd;
+
 use self::{track_header::TrackHeader, track_row::TrackRow};
 use crate::{
     app::{helpers::WidgetId, widgets::track_editor::constants::TRACK_HEADER_WIDTH},
@@ -48,24 +50,41 @@ impl TrackEditor {
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.style_mut().spacing.item_spacing = emath::vec2(0., 0.);
 
+            let mut tracks_to_delete = Vec::new();
+            let mut ordering = self.state.ui.tracks_ordering_in_id.write();
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
-                    for track in self.state.sheet_tracks_iter() {
-                        TrackHeader::new(track.key(), &mut track.value().write()).show(ui);
-                    }
+                    dnd(ui, WidgetId::TrackEditorHeaderOrderingDnd).show_vec(
+                        &mut ordering,
+                        |ui, track_id, handle, _state| {
+                            let Some(track) = self.state.sheet_get_track(track_id) else {
+                                return;
+                            };
+                            let output =
+                                TrackHeader::new(track_id, &mut track.write(), handle).show(ui);
+                            if output.delete_this_track {
+                                tracks_to_delete.push(track_id.clone());
+                            }
+                        },
+                    );
                 });
 
                 ui.vertical(|ui| {
                     egui::ScrollArea::horizontal().show(ui, |ui| {
-                        for track in self.state.sheet_tracks_iter() {
+                        for track_id in ordering.iter() {
+                            let Some(track) = self.state.sheet_get_track(track_id) else {
+                                continue;
+                            };
                             egui::Frame::NONE.show(ui, |ui| {
-                                TrackRow::new(&mut track.value().write(), self.state.clone())
-                                    .show(ui);
+                                TrackRow::new(&mut track.write(), self.state.clone()).show(ui);
                             });
                         }
                     });
                 });
             });
+            for track_id in tracks_to_delete {
+                self.state.sheet_del_track(&track_id);
+            }
         });
     }
 }

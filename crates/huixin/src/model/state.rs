@@ -85,6 +85,9 @@ pub struct CentralState {
 pub struct UiState {
     pub track_editor_size_per_beat: RwLock<f32>,
     pub pattern_editor_size_per_beat: RwLock<f32>,
+    pub tracks_ordering_in_id: RwLock<Vec<TrackId>>,
+    pub patterns_ordering_in_id: RwLock<Vec<PatternId>>,
+    pub targets_ordering_in_id: RwLock<Vec<TargetId>>,
 }
 
 impl UiState {
@@ -93,6 +96,9 @@ impl UiState {
 
     pub const STORAGE_KEY_TRACK_SPB: &str = "track-size-per-beat";
     pub const STORAGE_KEY_PATTERN_SPB: &str = "pattern-size-per-beat";
+    pub const STORAGE_KEY_TRACKS_ORDER: &str = "tracks-ordering";
+    pub const STORAGE_KEY_PATTERNS_ORDER: &str = "patterns-ordering";
+    pub const STORAGE_KEY_TARGETS_ORDER: &str = "targets-ordering";
 }
 
 #[derive(Debug)]
@@ -133,6 +139,9 @@ impl CentralState {
         let ui = UiState {
             track_editor_size_per_beat: RwLock::new(UiState::MIN_SIZE_PER_BEAT),
             pattern_editor_size_per_beat: RwLock::new(UiState::MIN_SIZE_PER_BEAT),
+            tracks_ordering_in_id: RwLock::new(Vec::new()),
+            patterns_ordering_in_id: RwLock::new(Vec::new()),
+            targets_ordering_in_id: RwLock::new(Vec::new()),
         };
         let sheet = Sheet {
             bpm: RwLock::new(130.),
@@ -279,12 +288,17 @@ impl CentralState {
         let target = Arc::new(RwLock::new(CommTarget::default()));
         let id: TargetId = LynId::obtain_string().into();
         self.sheet.targets.insert(id.clone(), target.clone());
+        self.ui.targets_ordering_in_id.write().push(id.clone());
         WithId::new(id, target)
     }
     pub fn sheet_del_comm_target(
         &self,
         id: &TargetId,
     ) -> Option<WithId<TargetId, Arc<RwLock<CommTarget>>>> {
+        self.ui
+            .targets_ordering_in_id
+            .write()
+            .retain(|tid| tid != id);
         self.sheet
             .targets
             .remove(id)
@@ -310,6 +324,7 @@ impl CentralState {
         }));
         let id: PatternId = LynId::obtain_string().into();
         self.sheet.patterns.insert(id.clone(), pat.clone());
+        self.ui.patterns_ordering_in_id.write().push(id.clone());
         WithId::new(id, pat)
     }
 
@@ -317,6 +332,10 @@ impl CentralState {
         &self,
         id: &PatternId,
     ) -> Option<WithId<PatternId, Arc<RwLock<SheetPattern>>>> {
+        self.ui
+            .patterns_ordering_in_id
+            .write()
+            .retain(|pid| pid != id);
         self.sheet
             .patterns
             .remove(id)
@@ -342,6 +361,7 @@ impl CentralState {
         }));
         let id: TrackId = LynId::obtain_string().into();
         self.sheet.tracks.insert(id.clone(), track.clone());
+        self.ui.tracks_ordering_in_id.write().push(id.clone());
         WithId::new(id, track)
     }
 
@@ -349,6 +369,10 @@ impl CentralState {
         &self,
         id: &TrackId,
     ) -> Option<WithId<TrackId, Arc<RwLock<SheetTrack>>>> {
+        self.ui
+            .tracks_ordering_in_id
+            .write()
+            .retain(|tid| tid != id);
         self.sheet
             .tracks
             .remove(id)

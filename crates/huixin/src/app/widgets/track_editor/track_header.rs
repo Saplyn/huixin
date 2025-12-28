@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use egui_winit::clipboard::Clipboard;
 
 use crate::{
@@ -10,17 +12,37 @@ use crate::{
 
 use super::constants::{TRACK_HEADER_WIDTH, TRACK_TIMELINE_HEIGHT};
 
-#[derive(Debug)]
-pub struct TrackHeader<'id, 'track> {
+pub struct TrackHeader<'id, 'track, 'handle> {
     id: &'id TrackId,
     track: &'track mut SheetTrack,
+    handle: egui_dnd::Handle<'handle>,
 }
 
-impl<'id, 'track> TrackHeader<'id, 'track> {
-    pub fn new(id: &'id TrackId, track: &'track mut SheetTrack) -> Self {
-        Self { id, track }
+impl<'id, 'track, 'handle> Debug for TrackHeader<'id, 'track, 'handle> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TrackHeader")
+            .field("id", self.id)
+            .field("track", self.track)
+            .finish()
     }
-    pub fn show(self, ui: &mut egui::Ui) {
+}
+
+#[derive(Debug)]
+pub struct TrackHeaderOutput {
+    pub delete_this_track: bool,
+}
+
+impl<'id, 'track, 'handle> TrackHeader<'id, 'track, 'handle> {
+    pub fn new(
+        id: &'id TrackId,
+        track: &'track mut SheetTrack,
+        handle: egui_dnd::Handle<'handle>,
+    ) -> Self {
+        Self { id, track, handle }
+    }
+    pub fn show(self, ui: &mut egui::Ui) -> TrackHeaderOutput {
+        let mut delete_this_track = false;
+
         let desired_size = emath::vec2(TRACK_HEADER_WIDTH, TRACK_TIMELINE_HEIGHT);
         let mut editing = ui
             .memory(|mem| mem.data.get_temp::<bool>(egui::Id::new(self.id)))
@@ -48,7 +70,7 @@ impl<'id, 'track> TrackHeader<'id, 'track> {
                     egui::Frame::central_panel(ui.style())
                         .stroke((0.4, ui.style().noninteractive().fg_stroke.color))
                         .show(ui, |ui| {
-                            ui.style_mut().spacing.item_spacing = emath::vec2(4., 4.);
+                            ui.style_mut().spacing.item_spacing = emath::vec2(2., 2.);
                             if editing {
                                 ui.horizontal(|ui| {
                                     ui.label("图标：");
@@ -87,20 +109,36 @@ impl<'id, 'track> TrackHeader<'id, 'track> {
                                 });
                             }
 
-                            ui.with_layout(egui::Layout::bottom_up(egui::Align::Max), |ui| {
-                                if editing {
-                                    if ui
-                                        .add(
-                                            egui::Button::new(egui::RichText::new(" "))
-                                                .selected(true),
-                                        )
-                                        .clicked()
-                                    {
-                                        editing = false;
-                                    }
-                                } else if ui.button(" ").clicked() {
-                                    editing = true;
-                                }
+                            ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                                ui.horizontal(|ui| {
+                                    self.handle.ui(ui, |ui| {
+                                        ui.label(egui::RichText::new("󰇜").heading());
+                                    });
+
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Max),
+                                        |ui| {
+                                            if editing {
+                                                if ui
+                                                    .add(
+                                                        egui::Button::new(egui::RichText::new(
+                                                            " ",
+                                                        ))
+                                                        .selected(true),
+                                                    )
+                                                    .clicked()
+                                                {
+                                                    editing = false;
+                                                }
+                                                if ui.button(" ").clicked() {
+                                                    delete_this_track = true;
+                                                }
+                                            } else if ui.button(" ").clicked() {
+                                                editing = true;
+                                            }
+                                        },
+                                    );
+                                });
                             });
                         })
                 },
@@ -110,5 +148,7 @@ impl<'id, 'track> TrackHeader<'id, 'track> {
         ui.memory_mut(|mem| {
             mem.data.insert_temp(egui::Id::new(self.id), editing);
         });
+
+        TrackHeaderOutput { delete_this_track }
     }
 }

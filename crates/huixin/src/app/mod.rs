@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fs,
     ops::DerefMut,
     sync::{Arc, mpsc},
@@ -7,6 +8,7 @@ use std::{
 };
 
 use egui::containers::menu::MenuButton;
+use egui_dnd::dnd;
 use log::warn;
 
 use self::{
@@ -24,7 +26,6 @@ use crate::{
         pattern::{SheetPatternTrait, SheetPatternType},
         persistence::{AppStorage, WorkingDirectory},
         state::{CentralState, UiState},
-        track::SheetTrackType,
     },
     routines::{RoutineId, guardian, instructor, metronome, sheet_reader},
 };
@@ -170,6 +171,56 @@ impl MainApp {
         *self.state.ui.pattern_editor_size_per_beat.write() =
             eframe::get_value(storage, &AppStorage::key(UiState::STORAGE_KEY_PATTERN_SPB))
                 .unwrap_or(UiState::MIN_SIZE_PER_BEAT);
+
+        *self.state.ui.tracks_ordering_in_id.write() =
+            eframe::get_value(storage, &AppStorage::key(UiState::STORAGE_KEY_TRACKS_ORDER))
+                .unwrap_or_default();
+        let mut track_id_set = HashSet::new();
+        for id in self.state.sheet_tracks_iter().map(|e| e.key().clone()) {
+            track_id_set.insert(id);
+        }
+        for id in self.state.ui.tracks_ordering_in_id.read().iter() {
+            track_id_set.remove(id);
+        }
+        for id in track_id_set {
+            self.state.ui.tracks_ordering_in_id.write().push(id);
+        }
+
+        *self.state.ui.patterns_ordering_in_id.write() = eframe::get_value(
+            storage,
+            &AppStorage::key(UiState::STORAGE_KEY_PATTERNS_ORDER),
+        )
+        .unwrap_or_default();
+        let mut pattern_id_set = HashSet::new();
+        for id in self.state.sheet_patterns_iter().map(|e| e.key().clone()) {
+            pattern_id_set.insert(id);
+        }
+        for id in self.state.ui.patterns_ordering_in_id.read().iter() {
+            pattern_id_set.remove(id);
+        }
+        for id in pattern_id_set {
+            self.state.ui.patterns_ordering_in_id.write().push(id);
+        }
+
+        *self.state.ui.targets_ordering_in_id.write() = eframe::get_value(
+            storage,
+            &AppStorage::key(UiState::STORAGE_KEY_TARGETS_ORDER),
+        )
+        .unwrap_or_default();
+        let mut target_id_set = HashSet::new();
+        for id in self
+            .state
+            .sheet_comm_targets_iter()
+            .map(|e| e.key().clone())
+        {
+            target_id_set.insert(id);
+        }
+        for id in self.state.ui.targets_ordering_in_id.read().iter() {
+            target_id_set.remove(id);
+        }
+        for id in target_id_set {
+            self.state.ui.targets_ordering_in_id.write().push(id);
+        }
     }
 }
 
@@ -224,6 +275,21 @@ impl eframe::App for MainApp {
             storage,
             &AppStorage::key(UiState::STORAGE_KEY_PATTERN_SPB),
             &self.state.ui.pattern_editor_size_per_beat,
+        );
+        eframe::set_value(
+            storage,
+            &AppStorage::key(UiState::STORAGE_KEY_TRACKS_ORDER),
+            &self.state.ui.tracks_ordering_in_id,
+        );
+        eframe::set_value(
+            storage,
+            &AppStorage::key(UiState::STORAGE_KEY_PATTERNS_ORDER),
+            &self.state.ui.patterns_ordering_in_id,
+        );
+        eframe::set_value(
+            storage,
+            &AppStorage::key(UiState::STORAGE_KEY_TARGETS_ORDER),
+            &self.state.ui.targets_ordering_in_id,
         );
     }
 
@@ -427,52 +493,61 @@ impl MainApp {
 
         egui::ScrollArea::vertical().show(ui, |ui| {
             let mut to_be_removed = Vec::new();
-            for entry in self.state.sheet_patterns_iter() {
-                let guard = entry.value().read();
-                ui.horizontal(|ui| {
-                    ui.style_mut().spacing.item_spacing = emath::vec2(4., 0.);
-                    let pat_color = guard.color();
-                    let icon_button = ui.add_sized(
-                        [46., ui.available_height()],
-                        egui::Button::new(
-                            egui::RichText::new(guard.icon_ref())
-                                .heading()
-                                .color(pat_color.lerp_to_gamma(text_color(pat_color), 0.6)),
-                        )
-                        .fill(pat_color),
-                    );
+            dnd(ui, WidgetId::MainAppExplorerPatternsOrderingDnd).show_vec(
+                &mut self.state.ui.patterns_ordering_in_id.write(),
+                |ui, pat_id, handle, _state| {
+                    let Some(arc) = self.state.sheet_get_pattern(pat_id) else {
+                        return;
+                    };
+                    let guard = arc.read();
+                    ui.horizontal(|ui| {
+                        ui.style_mut().spacing.item_spacing = emath::vec2(4., 0.);
+                        let pat_color = guard.color();
 
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                        if ui.button(egui::RichText::new(" ").heading()).clicked() {
-                            to_be_removed.push(entry.key().clone());
-                        }
-
-                        let pat_button = ui.add_sized(
-                            ui.available_size(),
-                            egui::Button::new(guard.name_ref())
-                                .right_text("")
-                                .selected(
-                                    self.state
-                                        .selected_pattern_id()
-                                        .as_ref()
-                                        .is_some_and(|pat| pat == entry.key()),
+                        handle.ui(ui, |ui| {
+                            ui.add_sized(
+                                [46., ui.available_height()],
+                                egui::Button::new(
+                                    egui::RichText::new(guard.icon_ref())
+                                        .heading()
+                                        .color(pat_color.lerp_to_gamma(text_color(pat_color), 0.6)),
                                 )
-                                .frame_when_inactive(true),
-                        );
-                        if pat_button.clicked() || icon_button.clicked() {
-                            self.state.select_pattern(Some(entry.key().clone()));
-                        };
-                        if pat_button.double_clicked() || icon_button.double_clicked() {
-                            *self
-                                .tools
-                                .iter_mut()
-                                .find(|tool| tool.tool_id() == ToolWindowId::PatternEditor)
-                                .unwrap()
-                                .window_open_mut() = true;
-                        };
+                                .fill(pat_color),
+                            );
+                        });
+
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                            if ui.button(egui::RichText::new(" ").heading()).clicked() {
+                                to_be_removed.push(pat_id.clone());
+                            }
+
+                            let pat_button = ui.add_sized(
+                                ui.available_size(),
+                                egui::Button::new(guard.name_ref())
+                                    .right_text("")
+                                    .selected(
+                                        self.state
+                                            .selected_pattern_id()
+                                            .as_ref()
+                                            .is_some_and(|pat| pat == pat_id),
+                                    )
+                                    .frame_when_inactive(true),
+                            );
+                            if pat_button.clicked() {
+                                self.state.select_pattern(Some(pat_id.clone()));
+                            };
+                            if pat_button.double_clicked() {
+                                *self
+                                    .tools
+                                    .iter_mut()
+                                    .find(|tool| tool.tool_id() == ToolWindowId::PatternEditor)
+                                    .unwrap()
+                                    .window_open_mut() = true;
+                            };
+                        });
                     });
-                });
-            }
+                },
+            );
             for pat_id in to_be_removed {
                 self.state.sheet_del_pattern(&pat_id);
             }
