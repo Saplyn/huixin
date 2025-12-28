@@ -50,31 +50,46 @@ impl ops::DerefMut for Instruction {
 
 impl Instruction {
     fn into_osc_packet(self) -> OscPacket {
-        let args = self
-            .data
-            .into_iter()
-            .filter_map(|(_, v)| match v {
-                json::Value::Null => Some(osc::OscType::Nil),
-                json::Value::Bool(b) => Some(osc::OscType::Bool(b)),
-                json::Value::Number(n) => Some(if let Some(i) = n.as_i64() {
-                    osc::OscType::Int(i as i32)
-                } else if let Some(f) = n.as_f64() {
-                    osc::OscType::Float(f as f32)
-                } else {
-                    return None;
-                }),
-                json::Value::String(s) => Some(osc::OscType::String(s)),
-                _ => None,
-            })
-            .collect::<Vec<osc::OscType>>();
-
-        let addr = if self.tag.starts_with('/') {
+        let addr_prefix = if self.tag.starts_with('/') {
             self.tag
         } else {
             format!("/{}", self.tag)
         };
+        let addr_prefix = addr_prefix.trim_end_matches('/');
 
-        OscPacket::Message(OscMessage { addr, args })
+        let messages: Vec<OscPacket> = self
+            .data
+            .into_iter()
+            .filter_map(|(k, v)| {
+                let addr = format!("{}/{}", addr_prefix, k);
+                let arg = match v {
+                    json::Value::Null => Some(osc::OscType::Nil),
+                    json::Value::Bool(b) => Some(osc::OscType::Bool(b)),
+                    json::Value::Number(n) => {
+                        if let Some(i) = n.as_i64() {
+                            Some(osc::OscType::Int(i as i32))
+                        } else {
+                            n.as_f64().map(|f| osc::OscType::Float(f as f32))
+                        }
+                    }
+                    json::Value::String(s) => Some(osc::OscType::String(s)),
+                    _ => None,
+                }?;
+
+                Some(OscPacket::Message(OscMessage {
+                    addr,
+                    args: vec![arg],
+                }))
+            })
+            .collect();
+
+        OscPacket::Bundle(osc::OscBundle {
+            timetag: osc::OscTime {
+                seconds: 0,
+                fractional: 1,
+            },
+            content: messages,
+        })
     }
 }
 
