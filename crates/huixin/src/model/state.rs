@@ -24,6 +24,8 @@ use crate::{
     routines::{RoutineId, metronome::TICK_PER_BEAT},
 };
 
+// LYN: Model Id
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PatternId(String);
 impl From<String> for PatternId {
@@ -165,6 +167,8 @@ impl CentralState {
         }
     }
 }
+
+// LYN: State APIs
 
 impl CentralState {
     pub fn selected_pattern_id(&self) -> RwLockReadGuard<'_, Option<PatternId>> {
