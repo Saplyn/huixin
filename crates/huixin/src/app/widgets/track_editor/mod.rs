@@ -51,7 +51,7 @@ impl TrackEditor {
             ui.style_mut().spacing.item_spacing = emath::vec2(0., 0.);
 
             let mut tracks_to_delete = Vec::new();
-            let mut ordering = self.state.ui.tracks_ordering_in_id.write();
+            let mut ordering = self.state.sheet_tracks_ordering_mut();
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
                     dnd(ui, WidgetId::TrackEditorHeaderOrderingDnd).show_vec(

@@ -1861,6 +1861,7 @@ version = "0.0.0"
 dependencies = [
  "chrono",
  "cpal",
+ "dashmap",
  "dasp",
  "eframe",
  "egui",
@@ -1868,7 +1869,10 @@ dependencies = [
  "emath",
  "log",
  "lyn-util",
+ "parking_lot",
+ "serde",
  "simplelog",
+ "tungstenite",
 ]
 
 [[package]]

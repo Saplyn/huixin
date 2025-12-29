@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
+use lyn_util::types::WithId;
+
 use self::pattern_row::PatternTrackRow;
 use crate::{
     app::widgets::track_editor::track_row::pattern_row::track_pattern::TrackPatternWidget,
-    model::{
-        state::{CentralState, WithId},
-        track::SheetTrack,
-    },
+    model::{state::CentralState, track::SheetTrack},
     routines::metronome::TICK_PER_BEAT,
 };
 

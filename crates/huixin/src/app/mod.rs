@@ -171,56 +171,6 @@ impl MainApp {
         *self.state.ui.pattern_editor_size_per_beat.write() =
             eframe::get_value(storage, &AppStorage::key(UiState::STORAGE_KEY_PATTERN_SPB))
                 .unwrap_or(UiState::MIN_SIZE_PER_BEAT);
-
-        *self.state.ui.tracks_ordering_in_id.write() =
-            eframe::get_value(storage, &AppStorage::key(UiState::STORAGE_KEY_TRACKS_ORDER))
-                .unwrap_or_default();
-        let mut track_id_set = HashSet::new();
-        for id in self.state.sheet_tracks_iter().map(|e| e.key().clone()) {
-            track_id_set.insert(id);
-        }
-        for id in self.state.ui.tracks_ordering_in_id.read().iter() {
-            track_id_set.remove(id);
-        }
-        for id in track_id_set {
-            self.state.ui.tracks_ordering_in_id.write().push(id);
-        }
-
-        *self.state.ui.patterns_ordering_in_id.write() = eframe::get_value(
-            storage,
-            &AppStorage::key(UiState::STORAGE_KEY_PATTERNS_ORDER),
-        )
-        .unwrap_or_default();
-        let mut pattern_id_set = HashSet::new();
-        for id in self.state.sheet_patterns_iter().map(|e| e.key().clone()) {
-            pattern_id_set.insert(id);
-        }
-        for id in self.state.ui.patterns_ordering_in_id.read().iter() {
-            pattern_id_set.remove(id);
-        }
-        for id in pattern_id_set {
-            self.state.ui.patterns_ordering_in_id.write().push(id);
-        }
-
-        *self.state.ui.targets_ordering_in_id.write() = eframe::get_value(
-            storage,
-            &AppStorage::key(UiState::STORAGE_KEY_TARGETS_ORDER),
-        )
-        .unwrap_or_default();
-        let mut target_id_set = HashSet::new();
-        for id in self
-            .state
-            .sheet_comm_targets_iter()
-            .map(|e| e.key().clone())
-        {
-            target_id_set.insert(id);
-        }
-        for id in self.state.ui.targets_ordering_in_id.read().iter() {
-            target_id_set.remove(id);
-        }
-        for id in target_id_set {
-            self.state.ui.targets_ordering_in_id.write().push(id);
-        }
     }
 }
 
@@ -275,21 +225,6 @@ impl eframe::App for MainApp {
             storage,
             &AppStorage::key(UiState::STORAGE_KEY_PATTERN_SPB),
             &self.state.ui.pattern_editor_size_per_beat,
-        );
-        eframe::set_value(
-            storage,
-            &AppStorage::key(UiState::STORAGE_KEY_TRACKS_ORDER),
-            &self.state.ui.tracks_ordering_in_id,
-        );
-        eframe::set_value(
-            storage,
-            &AppStorage::key(UiState::STORAGE_KEY_PATTERNS_ORDER),
-            &self.state.ui.patterns_ordering_in_id,
-        );
-        eframe::set_value(
-            storage,
-            &AppStorage::key(UiState::STORAGE_KEY_TARGETS_ORDER),
-            &self.state.ui.targets_ordering_in_id,
         );
     }
 
@@ -494,7 +429,7 @@ impl MainApp {
         egui::ScrollArea::vertical().show(ui, |ui| {
             let mut to_be_removed = Vec::new();
             dnd(ui, WidgetId::MainAppExplorerPatternsOrderingDnd).show_vec(
-                &mut self.state.ui.patterns_ordering_in_id.write(),
+                &mut self.state.sheet_patterns_ordering_mut(),
                 |ui, pat_id, handle, _state| {
                     let Some(arc) = self.state.sheet_get_pattern(pat_id) else {
                         return;

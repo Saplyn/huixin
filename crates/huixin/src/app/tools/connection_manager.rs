@@ -66,7 +66,7 @@ impl ToolWindow for ConnectionManager {
 
                             let mut ordering_id_to_be_removed = Vec::new();
                             dnd(ui, WidgetId::ConnectionManagerTargetsOrderingDnd).show_vec(
-                                &mut self.state.ui.targets_ordering_in_id.write(),
+                                &mut self.state.sheet_targets_ordering_mut(),
                                 |ui, id, handle, state| {
                                     let Some(arc) = self.state.sheet_get_comm_target(id) else {
                                         ordering_id_to_be_removed.push(id.clone());
@@ -126,11 +126,7 @@ impl ToolWindow for ConnectionManager {
                                 },
                             );
                             for id in ordering_id_to_be_removed {
-                                self.state
-                                    .ui
-                                    .targets_ordering_in_id
-                                    .write()
-                                    .retain(|x| x != &id);
+                                self.state.sheet_targets_ordering_mut().retain(|x| x != &id);
                             }
                             for id in to_be_removed {
                                 self.state.sheet_del_comm_target(&id);

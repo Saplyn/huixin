@@ -18,6 +18,10 @@ emath = { version = "0.33", default-features = false }
 chrono = { version = "0.4", default-features = false }
 log = { version = "0.4", default-features = false }
 simplelog = { version = "0.12", default-features = false }
+# Concurrency
+parking_lot = { version = "0.12", default-features = false }
+dashmap = { version = "7.0.0-rc2", default-features = false }
+rayon = { version = "1.11", default-features = false }
 # Communication
 ws = { package = "tungstenite", version = "0.28.0", default-features = false }
 # Encoding

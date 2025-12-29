@@ -9,7 +9,7 @@ use std::{
 
 use dashmap::{DashMap, DashSet, mapref::one::Ref};
 use log::trace;
-use lyn_util::{comm::Format, egui::LynId};
+use lyn_util::{comm::Format, egui::LynId, types::WithId};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use serde::{Deserialize, Serialize};
@@ -50,28 +50,6 @@ impl From<String> for TargetId {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct WithId<I, T> {
-    pub id: I,
-    pub item: T,
-}
-impl<I, T> WithId<I, T> {
-    pub fn new(id: I, item: T) -> Self {
-        Self { id, item }
-    }
-}
-impl<I, T> ops::Deref for WithId<I, T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        &self.item
-    }
-}
-impl<I, T> ops::DerefMut for WithId<I, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.item
-    }
-}
-
 // LYN: Central State Holder
 
 #[derive(Debug)]
@@ -87,9 +65,6 @@ pub struct CentralState {
 pub struct UiState {
     pub track_editor_size_per_beat: RwLock<f32>,
     pub pattern_editor_size_per_beat: RwLock<f32>,
-    pub tracks_ordering_in_id: RwLock<Vec<TrackId>>,
-    pub patterns_ordering_in_id: RwLock<Vec<PatternId>>,
-    pub targets_ordering_in_id: RwLock<Vec<TargetId>>,
 }
 
 impl UiState {
@@ -98,9 +73,6 @@ impl UiState {
 
     pub const STORAGE_KEY_TRACK_SPB: &str = "track-size-per-beat";
     pub const STORAGE_KEY_PATTERN_SPB: &str = "pattern-size-per-beat";
-    pub const STORAGE_KEY_TRACKS_ORDER: &str = "tracks-ordering";
-    pub const STORAGE_KEY_PATTERNS_ORDER: &str = "patterns-ordering";
-    pub const STORAGE_KEY_TARGETS_ORDER: &str = "targets-ordering";
 }
 
 #[derive(Debug)]
@@ -127,6 +99,10 @@ pub struct Sheet {
     tracks: DashMap<TrackId, Arc<RwLock<SheetTrack>>>,
     patterns: DashMap<PatternId, Arc<RwLock<SheetPattern>>>,
     targets: DashMap<TargetId, Arc<RwLock<CommTarget>>>,
+
+    tracks_ordering: RwLock<Vec<TrackId>>,
+    patterns_ordering: RwLock<Vec<PatternId>>,
+    targets_ordering: RwLock<Vec<TargetId>>,
 }
 
 impl CentralState {
@@ -141,16 +117,18 @@ impl CentralState {
         let ui = UiState {
             track_editor_size_per_beat: RwLock::new(UiState::MIN_SIZE_PER_BEAT),
             pattern_editor_size_per_beat: RwLock::new(UiState::MIN_SIZE_PER_BEAT),
-            tracks_ordering_in_id: RwLock::new(Vec::new()),
-            patterns_ordering_in_id: RwLock::new(Vec::new()),
-            targets_ordering_in_id: RwLock::new(Vec::new()),
         };
         let sheet = Sheet {
             bpm: RwLock::new(130.),
             length_in_beats: RwLock::new(NonZero::<u64>::MIN),
+
             tracks: DashMap::new(),
             patterns: DashMap::new(),
             targets: DashMap::new(),
+
+            tracks_ordering: RwLock::new(Vec::new()),
+            patterns_ordering: RwLock::new(Vec::new()),
+            targets_ordering: RwLock::new(Vec::new()),
         };
         let metro = Metronome {
             playing: RwLock::new(false),
@@ -175,11 +153,9 @@ impl CentralState {
         self.app.selected_pattern.read()
     }
     pub fn selected_pattern(&self) -> Option<WithId<PatternId, Arc<RwLock<SheetPattern>>>> {
-        let pat_id_guard = self.app.selected_pattern.read();
-        self.sheet
-            .patterns
-            .get(pat_id_guard.as_ref()?)
-            .map(|entry| WithId::new(entry.key().clone(), entry.value().clone()))
+        let pat_id = self.app.selected_pattern.read().clone()?;
+        let pattern = self.sheet.patterns.get(&pat_id)?.clone();
+        Some(WithId::new(pat_id, pattern))
     }
     pub fn select_pattern(&self, pat_id: Option<PatternId>) {
         *self.app.selected_pattern.write() = pat_id;
@@ -292,17 +268,14 @@ impl CentralState {
         let target = Arc::new(RwLock::new(CommTarget::default()));
         let id: TargetId = LynId::obtain_string().into();
         self.sheet.targets.insert(id.clone(), target.clone());
-        self.ui.targets_ordering_in_id.write().push(id.clone());
+        self.sheet.targets_ordering.write().push(id.clone());
         WithId::new(id, target)
     }
     pub fn sheet_del_comm_target(
         &self,
         id: &TargetId,
     ) -> Option<WithId<TargetId, Arc<RwLock<CommTarget>>>> {
-        self.ui
-            .targets_ordering_in_id
-            .write()
-            .retain(|tid| tid != id);
+        self.sheet.targets_ordering.write().retain(|tid| tid != id);
         self.sheet
             .targets
             .remove(id)
@@ -328,7 +301,7 @@ impl CentralState {
         }));
         let id: PatternId = LynId::obtain_string().into();
         self.sheet.patterns.insert(id.clone(), pat.clone());
-        self.ui.patterns_ordering_in_id.write().push(id.clone());
+        self.sheet.patterns_ordering.write().push(id.clone());
         WithId::new(id, pat)
     }
 
@@ -336,10 +309,7 @@ impl CentralState {
         &self,
         id: &PatternId,
     ) -> Option<WithId<PatternId, Arc<RwLock<SheetPattern>>>> {
-        self.ui
-            .patterns_ordering_in_id
-            .write()
-            .retain(|pid| pid != id);
+        self.sheet.patterns_ordering.write().retain(|pid| pid != id);
         self.sheet
             .patterns
             .remove(id)
@@ -365,7 +335,7 @@ impl CentralState {
         }));
         let id: TrackId = LynId::obtain_string().into();
         self.sheet.tracks.insert(id.clone(), track.clone());
-        self.ui.tracks_ordering_in_id.write().push(id.clone());
+        self.sheet.tracks_ordering.write().push(id.clone());
         WithId::new(id, track)
     }
 
@@ -373,10 +343,7 @@ impl CentralState {
         &self,
         id: &TrackId,
     ) -> Option<WithId<TrackId, Arc<RwLock<SheetTrack>>>> {
-        self.ui
-            .tracks_ordering_in_id
-            .write()
-            .retain(|tid| tid != id);
+        self.sheet.tracks_ordering.write().retain(|tid| tid != id);
         self.sheet
             .tracks
             .remove(id)
@@ -389,6 +356,77 @@ impl CentralState {
 
     pub fn sheet_tracks_iter(&self) -> dashmap::iter::Iter<'_, TrackId, Arc<RwLock<SheetTrack>>> {
         self.sheet.tracks.iter()
+    }
+
+    pub fn sheet_patterns_ordering_mut(&self) -> RwLockWriteGuard<'_, Vec<PatternId>> {
+        self.sheet.patterns_ordering.write()
+    }
+    pub fn sheet_tracks_ordering_mut(&self) -> RwLockWriteGuard<'_, Vec<TrackId>> {
+        self.sheet.tracks_ordering.write()
+    }
+    pub fn sheet_targets_ordering_mut(&self) -> RwLockWriteGuard<'_, Vec<TargetId>> {
+        self.sheet.targets_ordering.write()
+    }
+    pub fn sheet_to_json_string_pretty(&self) -> Result<String, json::Error> {
+        json::to_string_pretty(&self.sheet)
+    }
+    pub fn sheet_from_json_str(&self, s: &str) -> Result<(), json::Error> {
+        let sheet: Sheet = json::from_str(s)?;
+        *self.sheet.bpm.write() = *sheet.bpm.read();
+        *self.sheet.length_in_beats.write() = *sheet.length_in_beats.read();
+        self.sheet.tracks.clear();
+        for entry in sheet.tracks.iter() {
+            self.sheet
+                .tracks
+                .insert(entry.key().clone(), entry.value().clone());
+        }
+        self.sheet.patterns.clear();
+        for entry in sheet.patterns.iter() {
+            self.sheet
+                .patterns
+                .insert(entry.key().clone(), entry.value().clone());
+        }
+        self.sheet.targets.clear();
+        for entry in sheet.targets.iter() {
+            self.sheet
+                .targets
+                .insert(entry.key().clone(), entry.value().clone());
+        }
+
+        *self.sheet.tracks_ordering.write() = sheet.tracks_ordering.read().clone();
+        let mut track_id_set: std::collections::HashSet<_> =
+            self.sheet.tracks.iter().map(|e| e.key().clone()).collect();
+        for id in self.sheet.tracks_ordering.read().iter() {
+            track_id_set.remove(id);
+        }
+        for id in track_id_set {
+            self.sheet.tracks_ordering.write().push(id);
+        }
+
+        *self.sheet.patterns_ordering.write() = sheet.patterns_ordering.read().clone();
+        let mut pattern_id_set: std::collections::HashSet<_> = self
+            .sheet
+            .patterns
+            .iter()
+            .map(|e| e.key().clone())
+            .collect();
+        for id in self.sheet.patterns_ordering.read().iter() {
+            pattern_id_set.remove(id);
+        }
+        for id in pattern_id_set {
+            self.sheet.patterns_ordering.write().push(id);
+        }
+
+        *self.sheet.targets_ordering.write() = sheet.targets_ordering.read().clone();
+        let mut target_id_set: std::collections::HashSet<_> =
+            self.sheet.targets.iter().map(|e| e.key().clone()).collect();
+        for id in self.sheet.targets_ordering.read().iter() {
+            target_id_set.remove(id);
+        }
+        for id in target_id_set {
+            self.sheet.targets_ordering.write().push(id);
+        }
+        Ok(())
     }
 }
 
@@ -446,33 +484,5 @@ impl CentralState {
             self.metro.tick_memory.insert(id, *curr_tick);
             Some(*curr_tick)
         }
-    }
-
-    pub fn sheet_to_json_string_pretty(&self) -> Result<String, json::Error> {
-        json::to_string_pretty(&self.sheet)
-    }
-    pub fn sheet_from_json_str(&self, s: &str) -> Result<(), json::Error> {
-        let sheet: Sheet = json::from_str(s)?;
-        *self.sheet.bpm.write() = *sheet.bpm.read();
-        *self.sheet.length_in_beats.write() = *sheet.length_in_beats.read();
-        self.sheet.tracks.clear();
-        for entry in sheet.tracks.iter() {
-            self.sheet
-                .tracks
-                .insert(entry.key().clone(), entry.value().clone());
-        }
-        self.sheet.patterns.clear();
-        for entry in sheet.patterns.iter() {
-            self.sheet
-                .patterns
-                .insert(entry.key().clone(), entry.value().clone());
-        }
-        self.sheet.targets.clear();
-        for entry in sheet.targets.iter() {
-            self.sheet
-                .targets
-                .insert(entry.key().clone(), entry.value().clone());
-        }
-        Ok(())
     }
 }
