@@ -1,5 +1,4 @@
 use std::{
-    collections::HashSet,
     fs,
     ops::DerefMut,
     sync::{Arc, mpsc},
@@ -10,6 +9,7 @@ use std::{
 use egui::containers::menu::MenuButton;
 use egui_dnd::dnd;
 use log::warn;
+use lyn_util::egui::text_color;
 
 use self::{
     helpers::WidgetId,
@@ -21,7 +21,7 @@ use self::{
 };
 use crate::{
     APP_ID,
-    app::{helpers::text_color, tools::ToolWindowId, widgets::track_editor::TrackEditor},
+    app::{tools::ToolWindowId, widgets::track_editor::TrackEditor},
     model::{
         pattern::{SheetPatternTrait, SheetPatternType},
         persistence::{AppStorage, WorkingDirectory},

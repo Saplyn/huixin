@@ -1,7 +1,7 @@
 use std::{ops::Range, sync::Arc};
 
 use crate::{
-    app::{helpers::text_color, widgets::track_editor::constants::TRACK_TIMELINE_HEIGHT},
+    app::widgets::track_editor::constants::TRACK_TIMELINE_HEIGHT,
     model::{
         pattern::{SheetPattern, SheetPatternTrait},
         state::{CentralState, PatternId},
@@ -9,7 +9,10 @@ use crate::{
     },
     routines::metronome::TICK_PER_BEAT,
 };
-use lyn_util::{egui::LynId, types::WithId};
+use lyn_util::{
+    egui::{LynId, text_color},
+    types::WithId,
+};
 
 pub const RESIZE_HANDLE_WIDTH: f32 = 8.;
 

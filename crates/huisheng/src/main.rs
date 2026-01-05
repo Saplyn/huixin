@@ -4,6 +4,8 @@ use simplelog::TermLogger;
 use crate::app::MainApp;
 
 mod app;
+mod model;
+mod routines;
 
 fn main() -> eframe::Result {
     init_logger().expect("Fail to start logger");

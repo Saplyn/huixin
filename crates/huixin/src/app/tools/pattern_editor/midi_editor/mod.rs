@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use egui_winit::clipboard::Clipboard;
+use lyn_util::egui::{copy_color, parse_color};
 
 use self::{midi_keyboard::MidiKeyboard, midi_note::MidiNoteWidget, midi_rows::MidiRows};
 use crate::{
-    app::helpers::{WidgetId, copy_color, parse_color},
+    app::helpers::WidgetId,
     model::{
         pattern::{SheetPatternTrait, midi::MidiPattern},
         state::CentralState,

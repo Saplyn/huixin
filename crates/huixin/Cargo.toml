@@ -14,8 +14,8 @@ eframe = { workspace = true, features = ["default", "persistence"] }
 egui = { workspace = true, features = ["persistence"] }
 ecolor = { workspace = true }
 emath = { workspace = true }
-egui-winit = "0.33"
-egui_dnd = "0.14"
+egui-winit = { workspace = true }
+egui_dnd = { workspace = true }
 rfd = "0.16"
 # Logging
 log = { workspace = true }
@@ -32,6 +32,6 @@ serde = { workspace = true }
 json = { workspace = true, features = ["default"] }
 toml = { workspace = true, features = ["default"] }
 # Misc
-either = "1.15"
+either = { workspace = true, features = ["default"] }
 lyn-util = { workspace = true }
 thiserror = "2.0"

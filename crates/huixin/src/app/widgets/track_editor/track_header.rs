@@ -1,13 +1,11 @@
 use std::fmt::Debug;
 
 use egui_winit::clipboard::Clipboard;
+use lyn_util::egui::{copy_color, parse_color};
 
-use crate::{
-    app::helpers::{copy_color, parse_color},
-    model::{
-        state::TrackId,
-        track::{SheetTrack, SheetTrackTrait},
-    },
+use crate::model::{
+    state::TrackId,
+    track::{SheetTrack, SheetTrackTrait},
 };
 
 use super::constants::{TRACK_HEADER_WIDTH, TRACK_TIMELINE_HEIGHT};

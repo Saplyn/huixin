@@ -5,6 +5,10 @@ pub enum WidgetId {
     MainAppTopToolBar,
     MainAppButtonStatusBar,
     MainAppLeftExplorerPanel,
+    MainAppCentralSnarlCanvas,
+    MainAppExplorerPatchesOrderingDnd,
+
+    SnarlNodeOscillatorWaveformComboBox(usize),
 }
 
 impl From<WidgetId> for egui::Id {
