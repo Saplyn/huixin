@@ -1,15 +1,17 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use egui::ecolor;
 use egui_snarl::{
     Snarl,
-    ui::{PinInfo, PinShape, SnarlPin, SnarlViewer},
+    ui::{SnarlPin, SnarlViewer},
 };
-use lyn_util::egui::LynId;
 
 use self::nodes::{oscillator::*, speaker::*};
 use crate::model::{
-    patch::node::{PatchNode, PatchNodeType, oscillator::Oscillator, speaker::Speaker},
+    patch::node::{
+        PatchNode, PatchNodeTrait, PatchNodeType, number::NumberNode, oscillator::Oscillator,
+        speaker::Speaker,
+    },
     state::CentralState,
 };
 
@@ -76,7 +78,7 @@ impl PatchViewer {
         }
 
         snarl.connect(from.id, to.id);
-        snarl[to.id.node].add_input(to.id.input, from.id);
+        snarl[to.id.node].take_input(to.id.input, from.id);
         self.output.rebuild = true;
     }
 
@@ -88,7 +90,7 @@ impl PatchViewer {
         snarl: &mut Snarl<NodeType>,
     ) {
         snarl.disconnect(from.id, to.id);
-        snarl[to.id.node].del_input(to.id.input, from.id);
+        snarl[to.id.node].drop_input(to.id.input, from.id);
         self.output.rebuild = true;
     }
 }
@@ -136,8 +138,11 @@ impl SnarlViewer<NodeType> for PatchViewer {
     ) -> impl SnarlPin + 'static {
         match snarl[pin.id.node].get_type() {
             // Signal
-            PatchNodeType::Oscillator => osc_input(pin, ui, snarl, pin.id.input),
-            PatchNodeType::Speaker => speaker_input(pin, ui, snarl, pin.id.input),
+            PatchNodeType::Oscillator => Oscillator::pin_input(pin, ui, snarl, pin.id.input),
+            PatchNodeType::Speaker => Speaker::pin_input(pin, ui, snarl, pin.id.input),
+
+            // Variable
+            PatchNodeType::Number => NumberNode::pin_input(pin, ui, snarl, pin.id.input),
         }
     }
 
@@ -151,20 +156,23 @@ impl SnarlViewer<NodeType> for PatchViewer {
     ) -> impl SnarlPin + 'static {
         match snarl[pin.id.node].get_type() {
             // Signal
-            PatchNodeType::Oscillator => osc_output(pin, ui, snarl, pin.id.output),
-            PatchNodeType::Speaker => speaker_output(pin, ui, snarl, pin.id.output),
+            PatchNodeType::Oscillator => Oscillator::pin_output(pin, ui, snarl, pin.id.output),
+            PatchNodeType::Speaker => Speaker::pin_output(pin, ui, snarl, pin.id.output),
+
+            // Variable
+            PatchNodeType::Number => NumberNode::pin_output(pin, ui, snarl, pin.id.output),
         }
     }
 
     // LYN: Graph Right Click Menu
 
-    fn has_graph_menu(&mut self, pos: egui::Pos2, snarl: &mut Snarl<NodeType>) -> bool {
+    fn has_graph_menu(&mut self, _pos: egui::Pos2, _snarl: &mut Snarl<NodeType>) -> bool {
         true
     }
     fn show_graph_menu(&mut self, pos: egui::Pos2, ui: &mut egui::Ui, snarl: &mut Snarl<NodeType>) {
         ui.menu_button("信号", |ui| {
             if ui.button("震荡器").clicked() {
-                self.insert_node(snarl, pos, PatchNode::Oscillator(Oscillator::new()));
+                self.insert_node(snarl, pos, PatchNode::Oscillator(Oscillator::new().into()));
                 ui.close();
             }
             if ui.button("扬声器").clicked() {
@@ -172,10 +180,9 @@ impl SnarlViewer<NodeType> for PatchViewer {
                 ui.close();
             }
         });
-        ui.menu_button("通讯", |ui| {});
-        ui.menu_button("逻辑", |ui| {});
         ui.menu_button("变量", |ui| {
             if ui.button("数字").clicked() {
+                self.insert_node(snarl, pos, PatchNode::Number(NumberNode::new()));
                 ui.close();
             }
             if ui.button("文字").clicked() {
@@ -210,6 +217,8 @@ impl SnarlViewer<NodeType> for PatchViewer {
                 ui.close();
             }
         });
+        ui.menu_button("通讯", |ui| {});
+        ui.menu_button("逻辑", |ui| {});
     }
 
     // LYN: Connect Action Impl
@@ -253,14 +262,14 @@ impl SnarlViewer<NodeType> for PatchViewer {
 
     // LYN: Right-Click Node Menu
 
-    fn has_node_menu(&mut self, node: &NodeType) -> bool {
+    fn has_node_menu(&mut self, _node: &NodeType) -> bool {
         true
     }
     fn show_node_menu(
         &mut self,
         node: egui_snarl::NodeId,
-        inputs: &[egui_snarl::InPin],
-        outputs: &[egui_snarl::OutPin],
+        _inputs: &[egui_snarl::InPin],
+        _outputs: &[egui_snarl::OutPin],
         ui: &mut egui::Ui,
         snarl: &mut Snarl<NodeType>,
     ) {

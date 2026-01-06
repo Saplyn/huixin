@@ -1,9 +1,11 @@
 use egui_snarl::OutPinId;
 
-use crate::model::patch::{PatchOutput, PatchOutputType, node::speaker::Speaker};
+use crate::model::patch::{
+    Block, Number, PatchOutputType,
+    node::{number::NumberNode, oscillator::Oscillator, speaker::Speaker},
+};
 
-use self::oscillator::Oscillator;
-
+pub mod number;
 pub mod oscillator;
 pub mod speaker;
 
@@ -12,14 +14,14 @@ pub mod speaker;
 #[derive(Debug)]
 pub enum PatchNode {
     // Signal
-    Oscillator(Oscillator),
+    Oscillator(Box<Oscillator>),
     Speaker(Speaker),
     // Communication
 
     // Logic
 
     // Variable
-    // Number(Number),
+    Number(NumberNode),
     // Text(String),
 
     // Calculation
@@ -40,8 +42,9 @@ pub enum PatchNodeType {
     // Signal
     Oscillator,
     Speaker,
+
     // Variable
-    // Number,
+    Number,
     // Text,
 
     // Calculation
@@ -57,38 +60,39 @@ pub enum PatchNodeType {
     // WaveClipper,
 }
 
-impl PatchNode {
-    #[inline]
-    pub fn name(&self) -> &str {
-        match self {
-            // Signal
-            PatchNode::Oscillator(_) => "振荡器",
-            PatchNode::Speaker(_) => "扬声器",
-            // Variable
-            // PatchNode::Number(_) => "数字",
-            // PatchNode::Text(_) => "文字",
-
-            // Calculation
-            // PatchNode::Expression(_) => "表达式",
-            // PatchNode::ADSRCurve(_) => "ADSR 曲线",
-            // PatchNode::MidiToFreq => "MIDI 转频率",
-
-            // Processing
-            // PatchNode::WaveAdder(_) => "加波器",
-            // PatchNode::WaveMultiplier(_) => "乘波器",
-            // PatchNode::WaveOffseter(_) => "移幅器",
-            // PatchNode::WaveScaler(_) => "倍幅器",
-            // PatchNode::WaveClipper(_) => "限幅器",
-        }
+pub trait PatchNodeTrait {
+    fn name(&self) -> &str;
+    fn inputs(&self) -> usize;
+    fn outputs(&self) -> usize;
+    fn pin_accept_multi(&self, pin_index: usize) -> bool;
+    fn input_type(&self, pin_index: usize) -> PatchOutputType;
+    fn output_type(&self, pin_index: usize) -> PatchOutputType;
+    fn take_input(&mut self, pin_index: usize, source: OutPinId);
+    fn drop_input(&mut self, pin_index: usize, source: OutPinId);
+    fn output_block(&self, pin_index: usize) -> Option<&Block> {
+        let _ = pin_index;
+        None
     }
+    fn output_number(&self, pin_index: usize) -> Option<Number> {
+        let _ = pin_index;
+        None
+    }
+    fn output_text(&self, pin_index: usize) -> Option<String> {
+        let _ = pin_index;
+        None
+    }
+}
+
+impl PatchNode {
     #[inline]
     pub fn get_type(&self) -> PatchNodeType {
         match self {
             // Signal
             PatchNode::Oscillator(_) => PatchNodeType::Oscillator,
             PatchNode::Speaker(_) => PatchNodeType::Speaker,
+
             // Variable
-            // PatchNode::Number(_) => PatchNodeType::Number,
+            PatchNode::Number(_) => PatchNodeType::Number,
             // PatchNode::Text(_) => PatchNodeType::Text,
 
             // Calculation
@@ -104,75 +108,150 @@ impl PatchNode {
             // PatchNode::WaveClipper(_) => PatchNodeType::WaveClipper,
         }
     }
+}
 
+impl PatchNodeTrait for PatchNode {
     #[inline]
-    pub fn inputs(&self) -> usize {
+    fn name(&self) -> &str {
         match self {
             // Signal
-            PatchNode::Oscillator(_) => Oscillator::INPUTS,
-            PatchNode::Speaker(_) => Speaker::INPUTS,
-        }
-    }
-    #[inline]
-    pub fn outputs(&self) -> usize {
-        match self {
-            // Signal
-            PatchNode::Oscillator(_) => Oscillator::OUTPUTS,
-            PatchNode::Speaker(_) => Speaker::OUTPUTS,
-        }
-    }
+            PatchNode::Oscillator(osc) => osc.name(),
+            PatchNode::Speaker(speaker) => speaker.name(),
 
-    #[inline]
-    pub fn pin_accept_multi(&self, pin_index: usize) -> bool {
-        match self {
-            // Signal
-            PatchNode::Oscillator(_) => Oscillator::INPUT_ACCEPT_MULTI[pin_index],
-            PatchNode::Speaker(_) => Speaker::INPUT_ACCEPT_MULTI[pin_index],
-        }
-    }
+            // Variable
+            PatchNode::Number(num) => num.name(),
+            // PatchNode::Text(_) => "文字",
 
-    #[inline]
-    pub fn input_type(&self, pin_index: usize) -> PatchOutputType {
-        match self {
-            // Signal
-            PatchNode::Oscillator(_) => Oscillator::INPUT_TYPE[pin_index],
-            PatchNode::Speaker(_) => Speaker::INPUT_TYPE[pin_index],
+            // Calculation
+            // PatchNode::Expression(_) => "表达式",
+            // PatchNode::ADSRCurve(_) => "ADSR 曲线",
+            // PatchNode::MidiToFreq => "MIDI 转频率",
+
+            // Processing
+            // PatchNode::WaveAdder(_) => "加波器",
+            // PatchNode::WaveMultiplier(_) => "乘波器",
+            // PatchNode::WaveOffseter(_) => "移幅器",
+            // PatchNode::WaveScaler(_) => "倍幅器",
+            // PatchNode::WaveClipper(_) => "限幅器",
         }
     }
 
     #[inline]
-    pub fn output_type(&self, pin_index: usize) -> PatchOutputType {
+    fn inputs(&self) -> usize {
         match self {
             // Signal
-            PatchNode::Oscillator(_) => Oscillator::OUTPUT_TYPE[pin_index],
-            PatchNode::Speaker(_) => Speaker::OUTPUT_TYPE[pin_index],
+            PatchNode::Oscillator(osc) => osc.inputs(),
+            PatchNode::Speaker(speaker) => speaker.inputs(),
+
+            // Variable
+            PatchNode::Number(num) => num.inputs(),
+        }
+    }
+    #[inline]
+    fn outputs(&self) -> usize {
+        match self {
+            // Signal
+            PatchNode::Oscillator(osc) => osc.outputs(),
+            PatchNode::Speaker(speaker) => speaker.outputs(),
+
+            // Variable
+            PatchNode::Number(num) => num.outputs(),
         }
     }
 
-    pub fn add_input(&mut self, pin_index: usize, source: OutPinId) {
+    #[inline]
+    fn pin_accept_multi(&self, pin_index: usize) -> bool {
         match self {
             // Signal
-            PatchNode::Oscillator(osc) => osc.set_input(pin_index, Some(source)),
-            PatchNode::Speaker(speaker) => speaker.add_input(pin_index, source),
+            PatchNode::Oscillator(osc) => osc.pin_accept_multi(pin_index),
+            PatchNode::Speaker(speaker) => speaker.pin_accept_multi(pin_index),
+
+            // Variable
+            PatchNode::Number(num) => num.pin_accept_multi(pin_index),
         }
     }
 
-    pub fn del_input(&mut self, pin_index: usize, source: OutPinId) {
+    #[inline]
+    fn input_type(&self, pin_index: usize) -> PatchOutputType {
         match self {
             // Signal
-            PatchNode::Oscillator(osc) => osc.set_input(pin_index, None),
-            PatchNode::Speaker(speaker) => speaker.del_input(pin_index, source),
+            PatchNode::Oscillator(osc) => osc.input_type(pin_index),
+            PatchNode::Speaker(speaker) => speaker.input_type(pin_index),
+
+            // Variable
+            PatchNode::Number(num) => num.input_type(pin_index),
         }
     }
 
-    pub fn output(&self, pin_index: usize) -> Option<PatchOutput> {
-        // TODO:
+    #[inline]
+    fn output_type(&self, pin_index: usize) -> PatchOutputType {
         match self {
             // Signal
-            PatchNode::Oscillator(osc) => {
-                Some(PatchOutput::Block(Box::new(osc.output_block().to_owned())))
-            }
-            PatchNode::Speaker(_) => None,
+            PatchNode::Oscillator(osc) => osc.output_type(pin_index),
+            PatchNode::Speaker(speaker) => speaker.output_type(pin_index),
+
+            // Variable
+            PatchNode::Number(num) => num.output_type(pin_index),
+        }
+    }
+
+    #[inline]
+    fn take_input(&mut self, pin_index: usize, source: OutPinId) {
+        match self {
+            // Signal
+            PatchNode::Oscillator(osc) => osc.take_input(pin_index, source),
+            PatchNode::Speaker(speaker) => speaker.take_input(pin_index, source),
+
+            // Variable
+            PatchNode::Number(num) => num.take_input(pin_index, source),
+        }
+    }
+
+    #[inline]
+    fn drop_input(&mut self, pin_index: usize, source: OutPinId) {
+        match self {
+            // Signal
+            PatchNode::Oscillator(osc) => osc.drop_input(pin_index, source),
+            PatchNode::Speaker(speaker) => speaker.drop_input(pin_index, source),
+
+            // Variable
+            PatchNode::Number(num) => num.drop_input(pin_index, source),
+        }
+    }
+
+    #[inline]
+    fn output_block(&self, pin_index: usize) -> Option<&Block> {
+        match self {
+            // Signal
+            PatchNode::Oscillator(osc) => osc.output_block(pin_index),
+            PatchNode::Speaker(speaker) => speaker.output_block(pin_index),
+
+            // Variable
+            PatchNode::Number(num) => num.output_block(pin_index),
+        }
+    }
+
+    #[inline]
+    fn output_number(&self, pin_index: usize) -> Option<Number> {
+        match self {
+            // Signal
+            PatchNode::Oscillator(osc) => osc.output_number(pin_index),
+            PatchNode::Speaker(speaker) => speaker.output_number(pin_index),
+
+            // Variable
+            PatchNode::Number(num) => num.output_number(pin_index),
+        }
+    }
+
+    #[inline]
+    fn output_text(&self, pin_index: usize) -> Option<String> {
+        match self {
+            // Signal
+            PatchNode::Oscillator(osc) => osc.output_text(pin_index),
+            PatchNode::Speaker(speaker) => speaker.output_text(pin_index),
+
+            // Variable
+            PatchNode::Number(_) => None,
         }
     }
 }

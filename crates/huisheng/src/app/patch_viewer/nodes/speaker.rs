@@ -7,34 +7,36 @@ use crate::{
 
 // LYN: Public Interface
 
-#[inline(always)]
-pub fn speaker_input(
-    pin: &egui_snarl::InPin,
-    ui: &mut egui::Ui,
-    snarl: &mut Snarl<NodeType>,
-    index: usize,
-) -> PinInfo {
-    match index {
-        Speaker::INPUT_LEFT_CHAN => speaker_input_left_chan(pin, ui, snarl),
-        Speaker::INPUT_RIGHT_CHAN => speaker_input_right_chan(pin, ui, snarl),
-        _ => unreachable!("speaker only has {} inputs", Speaker::INPUTS),
+impl Speaker {
+    #[inline(always)]
+    pub fn pin_input(
+        pin: &egui_snarl::InPin,
+        ui: &mut egui::Ui,
+        snarl: &mut Snarl<NodeType>,
+        index: usize,
+    ) -> PinInfo {
+        match index {
+            Self::INPUT_LEFT_CHAN => input_left_chan(pin, ui, snarl),
+            Self::INPUT_RIGHT_CHAN => input_right_chan(pin, ui, snarl),
+            _ => unreachable!("speaker only has {} inputs", Self::INPUTS),
+        }
     }
-}
 
-#[inline]
-pub fn speaker_output(
-    _pin: &egui_snarl::OutPin,
-    _ui: &mut egui::Ui,
-    _snarl: &mut Snarl<NodeType>,
-    _index: usize,
-) -> PinInfo {
-    unreachable!("speaker has {} outputs", Speaker::OUTPUTS);
+    #[inline]
+    pub fn pin_output(
+        _pin: &egui_snarl::OutPin,
+        _ui: &mut egui::Ui,
+        _snarl: &mut Snarl<NodeType>,
+        _index: usize,
+    ) -> PinInfo {
+        unreachable!("speaker has {} outputs", Self::OUTPUTS);
+    }
 }
 
 // LYN: Private Impl
 
 #[inline(always)]
-fn speaker_input_left_chan(
+fn input_left_chan(
     pin: &egui_snarl::InPin,
     ui: &mut egui::Ui,
     snarl: &mut Snarl<NodeType>,
@@ -48,7 +50,7 @@ fn speaker_input_left_chan(
 }
 
 #[inline(always)]
-fn speaker_input_right_chan(
+fn input_right_chan(
     pin: &egui_snarl::InPin,
     ui: &mut egui::Ui,
     snarl: &mut Snarl<NodeType>,

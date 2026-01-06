@@ -1,11 +1,13 @@
-use std::f64::consts::PI;
+use std::{f64::consts::PI, ops::RangeInclusive};
 
 use egui_snarl::OutPinId;
 use either::Either;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
 
-use crate::model::patch::{BLOCK_SIZE, Block, Number, PatchOutput, PatchOutputType};
+use crate::model::patch::{
+    BLOCK_SIZE, Block, Number, PatchOutput, PatchOutputType, node::PatchNodeTrait,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Oscillator {
@@ -39,6 +41,41 @@ impl Oscillator {
 
     pub const OUTPUT_BLOCK: usize = 0;
     pub const OUTPUT_TYPE: [PatchOutputType; Self::OUTPUTS] = [PatchOutputType::Block];
+
+    pub const FREQ_RANGE: RangeInclusive<Number> = 0.0..=Number::MAX;
+    pub const PHASE_RANGE: RangeInclusive<Number> = 0.0..=1.0;
+    pub const WAVEFORM_RANGE: RangeInclusive<usize> = 0..=4;
+}
+
+impl PatchNodeTrait for Oscillator {
+    fn name(&self) -> &str {
+        "振荡器"
+    }
+    fn inputs(&self) -> usize {
+        Self::INPUTS
+    }
+    fn outputs(&self) -> usize {
+        Self::OUTPUTS
+    }
+    fn pin_accept_multi(&self, pin_index: usize) -> bool {
+        Self::INPUT_ACCEPT_MULTI[pin_index]
+    }
+    fn input_type(&self, pin_index: usize) -> PatchOutputType {
+        Self::INPUT_TYPE[pin_index]
+    }
+    fn output_type(&self, pin_index: usize) -> PatchOutputType {
+        Self::OUTPUT_TYPE[pin_index]
+    }
+    fn take_input(&mut self, pin_index: usize, source: OutPinId) {
+        self.input_ids[pin_index] = Some(source);
+    }
+    fn drop_input(&mut self, pin_index: usize, _source: OutPinId) {
+        self.input_ids[pin_index] = None;
+    }
+    fn output_block(&self, pin_index: usize) -> Option<&Block> {
+        assert_eq!(pin_index, Self::OUTPUT_BLOCK);
+        Some(&self.memory)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,6 +85,18 @@ pub enum Waveform {
     Saw,
     Square,
     Noise,
+}
+
+impl From<usize> for Waveform {
+    fn from(value: usize) -> Self {
+        match value {
+            0 => Waveform::Sine,
+            1 => Waveform::Triangle,
+            2 => Waveform::Saw,
+            3 => Waveform::Square,
+            _ => Waveform::Noise,
+        }
+    }
 }
 
 impl Waveform {
@@ -78,14 +127,11 @@ impl Oscillator {
     pub fn reset(&mut self) {
         self.state = None;
     }
-    pub fn set_input(&mut self, pin_index: usize, source: Option<OutPinId>) {
-        self.input_ids[pin_index] = source;
+    pub fn input_for_pin(&self, pin_index: usize) -> &Option<OutPinId> {
+        &self.input_ids[pin_index]
     }
-    pub fn output_block(&self) -> &Block {
-        &self.memory
-    }
-    pub fn next_block(&mut self, sample_rate: Number) -> Block {
-        let step = self.freq_or_seed / sample_rate;
+    pub fn next_block(&mut self, sample_rate: impl Into<Number>) -> Block {
+        let step = self.freq_or_seed / sample_rate.into();
         let state = self
             .state
             .get_or_insert(if self.waveform == Waveform::Noise {

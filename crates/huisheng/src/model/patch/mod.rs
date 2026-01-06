@@ -35,14 +35,6 @@ pub type Number = f64;
 pub type Text = String;
 pub type Block = [Number; BLOCK_SIZE];
 
-#[derive(Debug, Clone)]
-pub enum PatchOutput {
-    Number(Number),
-    Text(Text),
-    Block(Box<Block>),
-    Bang,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PatchOutputType {
     Number,
@@ -51,16 +43,9 @@ pub enum PatchOutputType {
     Bang,
 }
 
+pub struct PatchOutput;
 impl PatchOutput {
     pub const fn empty_block() -> Block {
         [0.; BLOCK_SIZE]
-    }
-    pub fn get_type(&self) -> PatchOutputType {
-        match self {
-            PatchOutput::Number(_) => PatchOutputType::Number,
-            PatchOutput::Text(_) => PatchOutputType::Text,
-            PatchOutput::Block(_) => PatchOutputType::Block,
-            PatchOutput::Bang => PatchOutputType::Bang,
-        }
     }
 }
