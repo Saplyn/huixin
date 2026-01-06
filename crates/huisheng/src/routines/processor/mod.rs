@@ -5,7 +5,10 @@ use std::{
     time::Duration,
 };
 
-use cpal::traits::{DeviceTrait, StreamTrait};
+use cpal::{
+    FromSample, I24, Sample, SizedSample, U24,
+    traits::{DeviceTrait, StreamTrait},
+};
 use egui_snarl::{InPinId, NodeId, OutPinId};
 use log::{debug, info, trace, warn};
 use petgraph::{
@@ -15,7 +18,7 @@ use petgraph::{
 
 use crate::model::{
     patch::{
-        Block, Number, Patch, PatchOutput,
+        BLOCK_SIZE, Block, Number, Patch, PatchOutput,
         node::{
             PatchNode, PatchNodeTrait, PatchNodeType,
             number::NumberNode,
@@ -38,25 +41,14 @@ type DiGraphEdge = (usize /* from pin */, usize /* to pin */);
 pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
     let mut graph: DiGraph<DiGraphNode, DiGraphEdge> = DiGraph::new();
 
-    let (output_tx, output_rx) = mpsc::sync_channel::<Block>(1);
+    let device = &state.cpal.device;
+    let format = state.cpal.supported_config.sample_format();
+    let config = state.cpal.supported_config.config();
+    let sample_rate = config.sample_rate;
 
-    let stream = state
-        .cpal
-        .device
-        .build_output_stream(
-            &state.cpal.config,
-            move |output: &mut [f32], _| {
-                let block = output_rx.recv().unwrap();
-                for (frame, samp) in output.iter_mut().zip(block) {
-                    *frame = samp as f32;
-                }
-            },
-            move |err| {
-                info!("{:?}", err);
-            },
-            None,
-        )
-        .unwrap();
+    let (output_tx, output_rx) = mpsc::sync_channel::<[Number; 2]>(0);
+
+    let stream = build_stream(device, format, config, output_rx);
     stream.play().unwrap();
 
     loop {
@@ -78,7 +70,7 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
             let mut patch_guard = patch_arc.write();
 
             match patch_guard.snarl[node_id].get_type() {
-                // Signal
+                // Signal/Oscillator
                 PatchNodeType::Oscillator => {
                     let PatchNode::Oscillator(osc) = &patch_guard.snarl[node_id] else {
                         unreachable!();
@@ -132,18 +124,27 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
                     if let Some(waveform) = waveform {
                         osc.waveform = Waveform::from(waveform);
                     }
-                    osc.next_block(state.cpal.config.sample_rate);
+                    osc.next_block(sample_rate);
                 }
+
+                // Signal/Speaker
                 PatchNodeType::Speaker => {
                     let PatchNode::Speaker(speaker) = &mut patch_guard.snarl[node_id] else {
                         unreachable!();
                     };
-                    let sources = speaker
+
+                    let left_chan_src = speaker
                         .inputs_for_pin(Speaker::INPUT_LEFT_CHAN)
                         .iter()
                         .copied()
                         .collect::<Vec<_>>();
-                    for src in sources {
+                    let right_chan_src = speaker
+                        .inputs_for_pin(Speaker::INPUT_RIGHT_CHAN)
+                        .iter()
+                        .copied()
+                        .collect::<Vec<_>>();
+
+                    for src in left_chan_src {
                         let block = patch_guard.snarl[src.node]
                             .output_block(src.output)
                             .unwrap();
@@ -151,9 +152,17 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
                             *frame += *samp;
                         });
                     }
+                    for src in right_chan_src {
+                        let block = patch_guard.snarl[src.node]
+                            .output_block(src.output)
+                            .unwrap();
+                        output[1].iter_mut().zip(block).for_each(|(frame, samp)| {
+                            *frame += *samp;
+                        });
+                    }
                 }
 
-                // Variable
+                // Variable/Number
                 PatchNodeType::Number => {
                     let PatchNode::Number(num) = &patch_guard.snarl[node_id] else {
                         unreachable!();
@@ -174,12 +183,85 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
             }
         }
 
-        output_tx.send(output[0]).unwrap();
+        for (left_sample, right_sample) in output[0].into_iter().zip(output[1]) {
+            output_tx.send([left_sample, right_sample]).unwrap();
+        }
 
         thread::sleep(SLEEP_DURATION);
     }
 }
 
+// LYN: Stream Building
+
+fn build_stream(
+    device: &cpal::Device,
+    format: cpal::SampleFormat,
+    config: cpal::StreamConfig,
+    output_rx: mpsc::Receiver<[Number; 2]>,
+) -> cpal::Stream {
+    match format {
+        cpal::SampleFormat::I8 => build_stream_inner::<i8>(device, config, output_rx),
+        cpal::SampleFormat::I16 => build_stream_inner::<i16>(device, config, output_rx),
+        cpal::SampleFormat::I24 => build_stream_inner::<I24>(device, config, output_rx),
+        cpal::SampleFormat::I32 => build_stream_inner::<i32>(device, config, output_rx),
+        cpal::SampleFormat::I64 => build_stream_inner::<i64>(device, config, output_rx),
+
+        cpal::SampleFormat::U8 => build_stream_inner::<u8>(device, config, output_rx),
+        cpal::SampleFormat::U16 => build_stream_inner::<u16>(device, config, output_rx),
+        cpal::SampleFormat::U24 => build_stream_inner::<U24>(device, config, output_rx),
+        cpal::SampleFormat::U32 => build_stream_inner::<u32>(device, config, output_rx),
+        cpal::SampleFormat::U64 => build_stream_inner::<u64>(device, config, output_rx),
+
+        cpal::SampleFormat::F32 => build_stream_inner::<f32>(device, config, output_rx),
+        cpal::SampleFormat::F64 => build_stream_inner::<f64>(device, config, output_rx),
+
+        sample_format => panic!("Unsupported sample format '{sample_format}'"),
+    }
+}
+
+fn build_stream_inner<T>(
+    device: &cpal::Device,
+    config: cpal::StreamConfig,
+    output_rx: mpsc::Receiver<[Number; 2]>,
+) -> cpal::Stream
+where
+    T: SizedSample + FromSample<Number>,
+{
+    device
+        .build_output_stream(
+            &config,
+            move |output: &mut [T], _| {
+                write_stream(output, &output_rx, config.channels as usize);
+            },
+            move |err| {
+                info!("{:?}", err);
+            },
+            None,
+        )
+        .unwrap()
+}
+
+fn write_stream<T>(output: &mut [T], output_rx: &mpsc::Receiver<[Number; 2]>, channels: usize)
+where
+    T: Sample + FromSample<Number>,
+{
+    for frame in output.chunks_mut(channels) {
+        let [left_sample, right_sample] = output_rx.recv().unwrap();
+        if channels == 2 {
+            frame[0] = T::from_sample(left_sample);
+            frame[1] = T::from_sample(right_sample);
+        } else {
+            let val = T::from_sample((left_sample + right_sample) / 2.);
+            frame.iter_mut().for_each(|sample| {
+                *sample = val;
+            });
+        }
+    }
+}
+
+// LYN: Graph Building
+
+#[inline]
 fn rebuild_graph(state: &CentralState, graph: &mut DiGraph<DiGraphNode, DiGraphEdge>) {
     graph.clear();
     build_graph(state, graph);

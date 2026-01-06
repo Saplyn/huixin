@@ -6,7 +6,7 @@ use lyn_util::{egui::LynId, types::WithId};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use serde::{Deserialize, Serialize};
 
-use crate::{model::patch::Patch, routines::processor};
+use crate::model::patch::Patch;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PatchId(String);
@@ -39,7 +39,6 @@ pub struct CpalState {
     pub host: cpal::Host,
     pub device: cpal::Device,
     pub supported_config: cpal::SupportedStreamConfig,
-    pub config: cpal::StreamConfig,
 }
 
 impl Debug for CpalState {
@@ -47,7 +46,7 @@ impl Debug for CpalState {
         f.debug_struct("CpalState")
             .field("host", &"{cpal::Host}")
             .field("device", &self.device.description())
-            .field("config", &self.config)
+            .field("supported_config", &self.supported_config)
             .finish()
     }
 }
@@ -61,13 +60,11 @@ impl CentralState {
         let supported_config = device
             .default_output_config()
             .expect("failed to get default output config");
-        let config = supported_config.clone().into();
 
         let cpal = CpalState {
             host,
             device,
             supported_config,
-            config,
         };
         let sheet = Sheet {
             patches_ordering: RwLock::new(Vec::new()),
