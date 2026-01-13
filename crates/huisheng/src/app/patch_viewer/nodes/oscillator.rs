@@ -147,17 +147,9 @@ fn input_reset(pin: &egui_snarl::InPin, ui: &mut egui::Ui, snarl: &mut Snarl<Nod
 
     ui.label("重置");
 
-    match &*pin.remotes {
-        // no input
-        [] => {
-            if ui.button("  ").clicked() {
-                osc.reset();
-            }
-        }
-        // TODO: one input
-        [remote] => todo!(),
-        _ => unreachable!("This phase input pin have at most 1 input"),
-    };
+    if ui.button("  ").clicked() {
+        osc.reset();
+    }
 
     input_pin(
         This::INPUT_TYPE[This::INPUT_RESET],

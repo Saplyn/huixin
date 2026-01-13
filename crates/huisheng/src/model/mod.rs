@@ -1,3 +1,4 @@
+pub mod data_mem;
 pub mod patch;
 pub mod state;
 

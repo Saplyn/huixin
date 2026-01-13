@@ -1,12 +1,13 @@
 use std::{f64::consts::PI, ops::RangeInclusive};
 
-use egui_snarl::OutPinId;
+use egui_snarl::{NodeId, OutPinId};
 use either::Either;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
 
-use crate::model::patch::{
-    BLOCK_SIZE, Block, Number, PatchOutput, PatchOutputType, node::PatchNodeTrait,
+use crate::model::{
+    data_mem::NonBlockData,
+    patch::{BLOCK_SIZE, Block, Number, WireDataType, node::PatchNodeTrait},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -19,11 +20,12 @@ pub struct Oscillator {
 
     #[serde(skip)]
     state: Option<Either<Number, StdRng>>,
-    #[serde(skip, default = "PatchOutput::empty_block")]
+    #[serde(skip, default = "WireDataType::empty_block")]
     memory: Block,
 }
 
 impl Oscillator {
+    pub const NAME: &str = "振荡器";
     pub const INPUTS: usize = 4;
     pub const OUTPUTS: usize = 1;
 
@@ -31,16 +33,16 @@ impl Oscillator {
     pub const INPUT_PHASE: usize = 1;
     pub const INPUT_WAVEFORM: usize = 2;
     pub const INPUT_RESET: usize = 3;
-    pub const INPUT_TYPE: [PatchOutputType; Self::INPUTS] = [
-        PatchOutputType::Number,
-        PatchOutputType::Number,
-        PatchOutputType::Number,
-        PatchOutputType::Bang,
+    pub const INPUT_TYPE: [WireDataType; Self::INPUTS] = [
+        WireDataType::Number,
+        WireDataType::Number,
+        WireDataType::Number,
+        WireDataType::Bang,
     ];
     pub const INPUT_ACCEPT_MULTI: [bool; Self::INPUTS] = [false, false, false, false];
 
     pub const OUTPUT_BLOCK: usize = 0;
-    pub const OUTPUT_TYPE: [PatchOutputType; Self::OUTPUTS] = [PatchOutputType::Block];
+    pub const OUTPUT_TYPE: [WireDataType; Self::OUTPUTS] = [WireDataType::Block];
 
     pub const FREQ_RANGE: RangeInclusive<Number> = 0.0..=Number::MAX;
     pub const PHASE_RANGE: RangeInclusive<Number> = 0.0..=1.0;
@@ -49,7 +51,7 @@ impl Oscillator {
 
 impl PatchNodeTrait for Oscillator {
     fn name(&self) -> &str {
-        "振荡器"
+        Self::NAME
     }
     fn inputs(&self) -> usize {
         Self::INPUTS
@@ -60,11 +62,14 @@ impl PatchNodeTrait for Oscillator {
     fn pin_accept_multi(&self, pin_index: usize) -> bool {
         Self::INPUT_ACCEPT_MULTI[pin_index]
     }
-    fn input_type(&self, pin_index: usize) -> PatchOutputType {
+    fn input_type(&self, pin_index: usize) -> WireDataType {
         Self::INPUT_TYPE[pin_index]
     }
-    fn output_type(&self, pin_index: usize) -> PatchOutputType {
+    fn output_type(&self, pin_index: usize) -> WireDataType {
         Self::OUTPUT_TYPE[pin_index]
+    }
+    fn input_for_pin(&self, pin_index: usize) -> Option<OutPinId> {
+        self.input_ids[pin_index]
     }
     fn take_input(&mut self, pin_index: usize, source: OutPinId) {
         self.input_ids[pin_index] = Some(source);
@@ -75,6 +80,9 @@ impl PatchNodeTrait for Oscillator {
     fn output_block(&self, pin_index: usize) -> Option<&Block> {
         assert_eq!(pin_index, Self::OUTPUT_BLOCK);
         Some(&self.memory)
+    }
+    fn output_arbitrary(&mut self, _pin_index: usize, _node_id: NodeId) -> Option<NonBlockData> {
+        None
     }
 }
 
@@ -126,9 +134,6 @@ impl Oscillator {
     }
     pub fn reset(&mut self) {
         self.state = None;
-    }
-    pub fn input_for_pin(&self, pin_index: usize) -> &Option<OutPinId> {
-        &self.input_ids[pin_index]
     }
     pub fn next_block(&mut self, sample_rate: impl Into<Number>) -> Block {
         let step = self.freq_or_seed / sample_rate.into();

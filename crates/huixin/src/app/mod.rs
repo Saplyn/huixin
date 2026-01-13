@@ -151,6 +151,9 @@ impl MainApp {
 
     const STORAGE_KEY_CWD: &str = "working-directory";
     pub fn prepare_launch(&mut self, cc: &eframe::CreationContext<'_>) {
+        let egui_ctx = cc.egui_ctx.clone();
+        self.state.ui.ctx.set(egui_ctx).unwrap();
+
         let Some(storage) = cc.storage else {
             return;
         };
@@ -200,7 +203,7 @@ impl eframe::App for MainApp {
         if let Some(msg) = self.state.app_get_err_msg().as_ref() {
             ErrorModal::new(msg).draw(ctx);
         }
-        ctx.request_repaint(); // Uncomment this for continuous repainting (fix some UI update issues)
+        // ctx.request_repaint(); // Uncomment this for continuous repainting (fix some UI update issues)
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {

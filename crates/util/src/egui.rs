@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     hash::{DefaultHasher, Hash, Hasher},
-    sync::atomic::{AtomicU64, Ordering},
+    sync::atomic::{AtomicU64, AtomicUsize, Ordering},
 };
 
 use egui::{
@@ -56,11 +56,11 @@ const NUM_HASH_PREFIX: &str = "LynNumId";
 const STR_HASH_INFIX: &str = "LynStrId";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LynId(u64);
+pub struct LynId(usize);
 
 impl LynId {
     pub fn obtain() -> LynId {
-        static COUNTER: AtomicU64 = AtomicU64::new(1);
+        static COUNTER: AtomicUsize = AtomicUsize::new(1);
         LynId(COUNTER.fetch_add(1, Ordering::Relaxed))
     }
 

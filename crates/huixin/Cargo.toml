@@ -30,7 +30,6 @@ ws = { workspace = true, features = ["default"] }
 # Encoding
 serde = { workspace = true }
 json = { workspace = true, features = ["default"] }
-toml = { workspace = true, features = ["default"] }
 # Misc
 either = { workspace = true, features = ["default"] }
 lyn-util = { workspace = true }

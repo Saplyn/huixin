@@ -49,6 +49,11 @@ pub fn main(state: Arc<CentralState>) -> ! {
                 _ => *curr_tick_guard = curr_tick_guard.saturating_add(1),
             }
         }
+
+        // request repaint
+        if let Some(ctx) = state.ui.ctx.get() {
+            ctx.request_repaint();
+        }
     }
 }
 

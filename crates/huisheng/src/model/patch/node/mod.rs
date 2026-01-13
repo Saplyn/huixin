@@ -1,12 +1,23 @@
-use egui_snarl::OutPinId;
+use std::{collections::HashSet, sync::Arc};
 
-use crate::model::patch::{
-    Block, Number, PatchOutputType,
-    node::{number::NumberNode, oscillator::Oscillator, speaker::Speaker},
+use egui_snarl::{InPinId, NodeId, OutPinId};
+
+use crate::model::{
+    data_mem::NonBlockData,
+    patch::{
+        Bang, Block, Number, WireDataType,
+        node::{
+            bang::BangNode, number::NumberNode, oscillator::Oscillator, remote_data::RemoteData,
+            speaker::Speaker,
+        },
+    },
+    state::CentralState,
 };
 
+pub mod bang;
 pub mod number;
 pub mod oscillator;
+pub mod remote_data;
 pub mod speaker;
 
 // LYN: Snarl Node Impl
@@ -16,13 +27,17 @@ pub enum PatchNode {
     // Signal
     Oscillator(Box<Oscillator>),
     Speaker(Speaker),
+
     // Communication
+    // RemoteData(RemoteData),
 
     // Logic
 
     // Variable
     Number(NumberNode),
-    // Text(String),
+    // Text(TextNode),
+    Bang(BangNode),
+    //
 
     // Calculation
     // Expression(Expression),
@@ -35,9 +50,12 @@ pub enum PatchNode {
     // WaveOffseter(WaveOffseter),
     // WaveScaler(WaveScaler),
     // WaveClipper(WaveClipper),
+
+    // Communication
+    RemoteData(RemoteData),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PatchNodeType {
     // Signal
     Oscillator,
@@ -46,6 +64,8 @@ pub enum PatchNodeType {
     // Variable
     Number,
     // Text,
+    Bang,
+    //
 
     // Calculation
     // Expression,
@@ -58,6 +78,9 @@ pub enum PatchNodeType {
     // WaveOffseter,
     // WaveScaler,
     // WaveClipper,
+
+    // Communication
+    RemoteData,
 }
 
 pub trait PatchNodeTrait {
@@ -65,10 +88,18 @@ pub trait PatchNodeTrait {
     fn inputs(&self) -> usize;
     fn outputs(&self) -> usize;
     fn pin_accept_multi(&self, pin_index: usize) -> bool;
-    fn input_type(&self, pin_index: usize) -> PatchOutputType;
-    fn output_type(&self, pin_index: usize) -> PatchOutputType;
+    fn input_type(&self, pin_index: usize) -> WireDataType;
+    fn output_type(&self, pin_index: usize) -> WireDataType;
     fn take_input(&mut self, pin_index: usize, source: OutPinId);
     fn drop_input(&mut self, pin_index: usize, source: OutPinId);
+    fn input_for_pin(&self, pin_index: usize) -> Option<OutPinId> {
+        let _ = pin_index;
+        None
+    }
+    fn inputs_for_pin(&self, pin_index: usize) -> Option<&HashSet<OutPinId>> {
+        let _ = pin_index;
+        None
+    }
     fn output_block(&self, pin_index: usize) -> Option<&Block> {
         let _ = pin_index;
         None
@@ -80,6 +111,21 @@ pub trait PatchNodeTrait {
     fn output_text(&self, pin_index: usize) -> Option<String> {
         let _ = pin_index;
         None
+    }
+    fn output_bang(&mut self, pin_index: usize, node_id: NodeId) -> Option<Bang> {
+        let _ = (pin_index, node_id);
+        None
+    }
+    fn output_arbitrary(&mut self, pin_index: usize, node_id: NodeId) -> Option<NonBlockData>;
+    fn pre_process(&mut self, state: Arc<CentralState>) {
+        let _ = state;
+    }
+    fn post_process(&mut self) {}
+    fn on_output_connect(&mut self, pin_index: usize, remote: InPinId) {
+        let _ = (pin_index, remote);
+    }
+    fn on_output_disconnect(&mut self, pin_index: usize, remote: InPinId) {
+        let _ = (pin_index, remote);
     }
 }
 
@@ -94,6 +140,8 @@ impl PatchNode {
             // Variable
             PatchNode::Number(_) => PatchNodeType::Number,
             // PatchNode::Text(_) => PatchNodeType::Text,
+            PatchNode::Bang(_) => PatchNodeType::Bang,
+            //
 
             // Calculation
             // PatchNode::Expression(_) => PatchNodeType::Expression,
@@ -106,152 +154,120 @@ impl PatchNode {
             // PatchNode::WaveOffseter(_) => PatchNodeType::WaveOffseter,
             // PatchNode::WaveScaler(_) => PatchNodeType::WaveScaler,
             // PatchNode::WaveClipper(_) => PatchNodeType::WaveClipper,
+
+            // Communication
+            PatchNode::RemoteData(_) => PatchNodeType::RemoteData,
         }
     }
+}
+
+macro_rules! delegate_to_node {
+    ($self:expr, $method:ident $(, $arg:expr)*) => {
+        match $self {
+            PatchNode::Oscillator(osc) => osc.$method($($arg),*),
+            PatchNode::Speaker(speaker) => speaker.$method($($arg),*),
+            PatchNode::Number(num) => num.$method($($arg),*),
+            PatchNode::Bang(bang) => bang.$method($($arg),*),
+            PatchNode::RemoteData(remote) => remote.$method($($arg),*),
+        }
+    };
 }
 
 impl PatchNodeTrait for PatchNode {
     #[inline]
     fn name(&self) -> &str {
-        match self {
-            // Signal
-            PatchNode::Oscillator(osc) => osc.name(),
-            PatchNode::Speaker(speaker) => speaker.name(),
-
-            // Variable
-            PatchNode::Number(num) => num.name(),
-            // PatchNode::Text(_) => "文字",
-
-            // Calculation
-            // PatchNode::Expression(_) => "表达式",
-            // PatchNode::ADSRCurve(_) => "ADSR 曲线",
-            // PatchNode::MidiToFreq => "MIDI 转频率",
-
-            // Processing
-            // PatchNode::WaveAdder(_) => "加波器",
-            // PatchNode::WaveMultiplier(_) => "乘波器",
-            // PatchNode::WaveOffseter(_) => "移幅器",
-            // PatchNode::WaveScaler(_) => "倍幅器",
-            // PatchNode::WaveClipper(_) => "限幅器",
-        }
+        delegate_to_node!(self, name)
     }
 
     #[inline]
     fn inputs(&self) -> usize {
-        match self {
-            // Signal
-            PatchNode::Oscillator(osc) => osc.inputs(),
-            PatchNode::Speaker(speaker) => speaker.inputs(),
-
-            // Variable
-            PatchNode::Number(num) => num.inputs(),
-        }
+        delegate_to_node!(self, inputs)
     }
+
     #[inline]
     fn outputs(&self) -> usize {
-        match self {
-            // Signal
-            PatchNode::Oscillator(osc) => osc.outputs(),
-            PatchNode::Speaker(speaker) => speaker.outputs(),
-
-            // Variable
-            PatchNode::Number(num) => num.outputs(),
-        }
+        delegate_to_node!(self, outputs)
     }
 
     #[inline]
     fn pin_accept_multi(&self, pin_index: usize) -> bool {
-        match self {
-            // Signal
-            PatchNode::Oscillator(osc) => osc.pin_accept_multi(pin_index),
-            PatchNode::Speaker(speaker) => speaker.pin_accept_multi(pin_index),
-
-            // Variable
-            PatchNode::Number(num) => num.pin_accept_multi(pin_index),
-        }
+        delegate_to_node!(self, pin_accept_multi, pin_index)
     }
 
     #[inline]
-    fn input_type(&self, pin_index: usize) -> PatchOutputType {
-        match self {
-            // Signal
-            PatchNode::Oscillator(osc) => osc.input_type(pin_index),
-            PatchNode::Speaker(speaker) => speaker.input_type(pin_index),
-
-            // Variable
-            PatchNode::Number(num) => num.input_type(pin_index),
-        }
+    fn input_type(&self, pin_index: usize) -> WireDataType {
+        delegate_to_node!(self, input_type, pin_index)
     }
 
     #[inline]
-    fn output_type(&self, pin_index: usize) -> PatchOutputType {
-        match self {
-            // Signal
-            PatchNode::Oscillator(osc) => osc.output_type(pin_index),
-            PatchNode::Speaker(speaker) => speaker.output_type(pin_index),
+    fn output_type(&self, pin_index: usize) -> WireDataType {
+        delegate_to_node!(self, output_type, pin_index)
+    }
 
-            // Variable
-            PatchNode::Number(num) => num.output_type(pin_index),
-        }
+    #[inline]
+    fn input_for_pin(&self, pin_index: usize) -> Option<OutPinId> {
+        assert!(!self.pin_accept_multi(pin_index));
+        delegate_to_node!(self, input_for_pin, pin_index)
+    }
+
+    #[inline]
+    fn inputs_for_pin(&self, pin_index: usize) -> Option<&HashSet<OutPinId>> {
+        assert!(self.pin_accept_multi(pin_index));
+        delegate_to_node!(self, inputs_for_pin, pin_index)
     }
 
     #[inline]
     fn take_input(&mut self, pin_index: usize, source: OutPinId) {
-        match self {
-            // Signal
-            PatchNode::Oscillator(osc) => osc.take_input(pin_index, source),
-            PatchNode::Speaker(speaker) => speaker.take_input(pin_index, source),
-
-            // Variable
-            PatchNode::Number(num) => num.take_input(pin_index, source),
-        }
+        delegate_to_node!(self, take_input, pin_index, source)
     }
 
     #[inline]
     fn drop_input(&mut self, pin_index: usize, source: OutPinId) {
-        match self {
-            // Signal
-            PatchNode::Oscillator(osc) => osc.drop_input(pin_index, source),
-            PatchNode::Speaker(speaker) => speaker.drop_input(pin_index, source),
-
-            // Variable
-            PatchNode::Number(num) => num.drop_input(pin_index, source),
-        }
+        delegate_to_node!(self, drop_input, pin_index, source)
     }
 
     #[inline]
     fn output_block(&self, pin_index: usize) -> Option<&Block> {
-        match self {
-            // Signal
-            PatchNode::Oscillator(osc) => osc.output_block(pin_index),
-            PatchNode::Speaker(speaker) => speaker.output_block(pin_index),
-
-            // Variable
-            PatchNode::Number(num) => num.output_block(pin_index),
-        }
+        delegate_to_node!(self, output_block, pin_index)
     }
 
     #[inline]
     fn output_number(&self, pin_index: usize) -> Option<Number> {
-        match self {
-            // Signal
-            PatchNode::Oscillator(osc) => osc.output_number(pin_index),
-            PatchNode::Speaker(speaker) => speaker.output_number(pin_index),
-
-            // Variable
-            PatchNode::Number(num) => num.output_number(pin_index),
-        }
+        delegate_to_node!(self, output_number, pin_index)
     }
 
     #[inline]
     fn output_text(&self, pin_index: usize) -> Option<String> {
-        match self {
-            // Signal
-            PatchNode::Oscillator(osc) => osc.output_text(pin_index),
-            PatchNode::Speaker(speaker) => speaker.output_text(pin_index),
+        delegate_to_node!(self, output_text, pin_index)
+    }
 
-            // Variable
-            PatchNode::Number(_) => None,
-        }
+    #[inline]
+    fn output_bang(&mut self, pin_index: usize, node_id: NodeId) -> Option<Bang> {
+        delegate_to_node!(self, output_bang, pin_index, node_id)
+    }
+
+    #[inline]
+    fn output_arbitrary(&mut self, pin_index: usize, node_id: NodeId) -> Option<NonBlockData> {
+        delegate_to_node!(self, output_arbitrary, pin_index, node_id)
+    }
+
+    #[inline]
+    fn pre_process(&mut self, state: Arc<CentralState>) {
+        delegate_to_node!(self, pre_process, state)
+    }
+
+    #[inline]
+    fn post_process(&mut self) {
+        delegate_to_node!(self, post_process)
+    }
+
+    #[inline]
+    fn on_output_connect(&mut self, pin_index: usize, remote: InPinId) {
+        delegate_to_node!(self, on_output_connect, pin_index, remote)
+    }
+
+    #[inline]
+    fn on_output_disconnect(&mut self, pin_index: usize, remote: InPinId) {
+        delegate_to_node!(self, on_output_disconnect, pin_index, remote)
     }
 }

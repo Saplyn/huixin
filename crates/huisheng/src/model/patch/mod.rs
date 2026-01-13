@@ -34,17 +34,20 @@ pub const BLOCK_SIZE: usize = 1024;
 pub type Number = f64;
 pub type Text = String;
 pub type Block = [Number; BLOCK_SIZE];
+pub type Bang = bool;
+pub type BangMarker = u8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PatchOutputType {
+pub enum WireDataType {
     Number,
     Text,
     Block,
     Bang,
+    NonBlock,
+    Constant,
 }
 
-pub struct PatchOutput;
-impl PatchOutput {
+impl WireDataType {
     pub const fn empty_block() -> Block {
         [0.; BLOCK_SIZE]
     }

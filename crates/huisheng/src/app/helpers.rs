@@ -8,6 +8,10 @@ pub enum WidgetId {
     MainAppCentralSnarlCanvas,
     MainAppExplorerPatchesOrderingDnd,
 
+    ErrorModal,
+
+    ConnectionManager,
+
     SnarlNodeOscillatorWaveformComboBox(usize),
 }
 

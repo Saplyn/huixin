@@ -1,15 +1,13 @@
 use std::sync::Arc;
 
 use egui_dnd::dnd;
-use lyn_util::egui::LynId;
-use parking_lot::RwLock;
 
 use crate::{
     app::{
         helpers::WidgetId,
         tools::{ToolWindow, ToolWindowId},
     },
-    model::{comm::CommTarget, state::CentralState},
+    model::state::CentralState,
 };
 
 #[derive(Debug)]

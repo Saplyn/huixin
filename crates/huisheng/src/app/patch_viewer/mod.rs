@@ -5,12 +5,15 @@ use egui_snarl::{
     Snarl,
     ui::{SnarlPin, SnarlViewer},
 };
+use log::info;
 
-use self::nodes::{oscillator::*, speaker::*};
 use crate::model::{
-    patch::node::{
-        PatchNode, PatchNodeTrait, PatchNodeType, number::NumberNode, oscillator::Oscillator,
-        speaker::Speaker,
+    patch::{
+        WireDataType,
+        node::{
+            PatchNode, PatchNodeTrait, PatchNodeType, bang::BangNode, number::NumberNode,
+            oscillator::Oscillator, remote_data::RemoteData, speaker::Speaker,
+        },
     },
     state::CentralState,
 };
@@ -64,8 +67,22 @@ impl PatchViewer {
         }
 
         // refuse invalid type connection
-        if snarl[to.id.node].input_type(to.id.input)
-            != snarl[from.id.node].output_type(from.id.output)
+        let (from_type, to_type) = (
+            snarl[from.id.node].output_type(from.id.output),
+            snarl[to.id.node].input_type(to.id.input),
+        );
+        let same_type = from_type == to_type;
+        let from_nonblock_valid =
+            from_type == WireDataType::NonBlock && to_type != WireDataType::Block;
+        let to_nonblock_valid =
+            to_type == WireDataType::NonBlock && from_type != WireDataType::Block;
+        let from_constant_valid = from_type == WireDataType::Constant
+            && matches!(to_type, WireDataType::Number | WireDataType::Text);
+        let to_constant_valid = to_type == WireDataType::Constant
+            && matches!(from_type, WireDataType::Number | WireDataType::Text);
+        if !same_type
+            && (!from_nonblock_valid && !to_nonblock_valid)
+            && (!from_constant_valid && !to_constant_valid)
         {
             return;
         }
@@ -79,6 +96,8 @@ impl PatchViewer {
 
         snarl.connect(from.id, to.id);
         snarl[to.id.node].take_input(to.id.input, from.id);
+        snarl[from.id.node].on_output_connect(from.id.output, to.id);
+
         self.output.rebuild = true;
     }
 
@@ -91,6 +110,8 @@ impl PatchViewer {
     ) {
         snarl.disconnect(from.id, to.id);
         snarl[to.id.node].drop_input(to.id.input, from.id);
+        snarl[from.id.node].on_output_disconnect(from.id.output, to.id);
+
         self.output.rebuild = true;
     }
 }
@@ -143,6 +164,10 @@ impl SnarlViewer<NodeType> for PatchViewer {
 
             // Variable
             PatchNodeType::Number => NumberNode::pin_input(pin, ui, snarl, pin.id.input),
+            PatchNodeType::Bang => BangNode::pin_input(pin, ui, snarl, pin.id.input),
+
+            // Communication
+            PatchNodeType::RemoteData => RemoteData::pin_input(pin, ui, snarl, pin.id.input),
         }
     }
 
@@ -161,6 +186,10 @@ impl SnarlViewer<NodeType> for PatchViewer {
 
             // Variable
             PatchNodeType::Number => NumberNode::pin_output(pin, ui, snarl, pin.id.output),
+            PatchNodeType::Bang => BangNode::pin_output(pin, ui, snarl, pin.id.output),
+
+            // Communication
+            PatchNodeType::RemoteData => RemoteData::pin_output(pin, ui, snarl, pin.id.output),
         }
     }
 
@@ -171,21 +200,25 @@ impl SnarlViewer<NodeType> for PatchViewer {
     }
     fn show_graph_menu(&mut self, pos: egui::Pos2, ui: &mut egui::Ui, snarl: &mut Snarl<NodeType>) {
         ui.menu_button("信号", |ui| {
-            if ui.button("震荡器").clicked() {
+            if ui.button(Oscillator::NAME).clicked() {
                 self.insert_node(snarl, pos, PatchNode::Oscillator(Oscillator::new().into()));
                 ui.close();
             }
-            if ui.button("扬声器").clicked() {
+            if ui.button(Speaker::NAME).clicked() {
                 self.insert_node(snarl, pos, PatchNode::Speaker(Speaker::new()));
                 ui.close();
             }
         });
         ui.menu_button("变量", |ui| {
-            if ui.button("数字").clicked() {
+            if ui.button(NumberNode::NAME).clicked() {
                 self.insert_node(snarl, pos, PatchNode::Number(NumberNode::new()));
                 ui.close();
             }
             if ui.button("文字").clicked() {
+                ui.close();
+            }
+            if ui.button(BangNode::NAME).clicked() {
+                self.insert_node(snarl, pos, PatchNode::Bang(BangNode::new()));
                 ui.close();
             }
         });
@@ -217,7 +250,12 @@ impl SnarlViewer<NodeType> for PatchViewer {
                 ui.close();
             }
         });
-        ui.menu_button("通讯", |ui| {});
+        ui.menu_button("通讯", |ui| {
+            if ui.button(RemoteData::NAME).clicked() {
+                self.insert_node(snarl, pos, PatchNode::RemoteData(RemoteData::new()));
+                ui.close();
+            }
+        });
         ui.menu_button("逻辑", |ui| {});
     }
 

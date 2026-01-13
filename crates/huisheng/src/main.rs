@@ -17,6 +17,7 @@ fn main() -> eframe::Result {
         native_options,
         Box::new(|cc| {
             cc.egui_ctx.load_chinese_fonts();
+            app.prepare_launch(cc);
             Ok(Box::new(app))
         }),
     )

@@ -2,8 +2,7 @@ use std::{
     io::Write,
     net::{SocketAddr, TcpStream},
     num::NonZero,
-    ops,
-    sync::Arc,
+    sync::{Arc, OnceLock},
     time::Duration,
 };
 
@@ -63,6 +62,7 @@ pub struct CentralState {
 
 #[derive(Debug)]
 pub struct UiState {
+    pub ctx: OnceLock<egui::Context>,
     pub track_editor_size_per_beat: RwLock<f32>,
     pub pattern_editor_size_per_beat: RwLock<f32>,
 }
@@ -97,11 +97,12 @@ pub struct Sheet {
     length_in_beats: RwLock<NonZero<u64>>,
 
     tracks: DashMap<TrackId, Arc<RwLock<SheetTrack>>>,
-    patterns: DashMap<PatternId, Arc<RwLock<SheetPattern>>>,
-    targets: DashMap<TargetId, Arc<RwLock<CommTarget>>>,
-
     tracks_ordering: RwLock<Vec<TrackId>>,
+
+    patterns: DashMap<PatternId, Arc<RwLock<SheetPattern>>>,
     patterns_ordering: RwLock<Vec<PatternId>>,
+
+    targets: DashMap<TargetId, Arc<RwLock<CommTarget>>>,
     targets_ordering: RwLock<Vec<TargetId>>,
 }
 
@@ -115,6 +116,7 @@ impl CentralState {
             comm_stream_connecting: DashSet::new(),
         };
         let ui = UiState {
+            ctx: OnceLock::new(),
             track_editor_size_per_beat: RwLock::new(UiState::MIN_SIZE_PER_BEAT),
             pattern_editor_size_per_beat: RwLock::new(UiState::MIN_SIZE_PER_BEAT),
         };
@@ -123,11 +125,12 @@ impl CentralState {
             length_in_beats: RwLock::new(NonZero::<u64>::MIN),
 
             tracks: DashMap::new(),
-            patterns: DashMap::new(),
-            targets: DashMap::new(),
-
             tracks_ordering: RwLock::new(Vec::new()),
+
+            patterns: DashMap::new(),
             patterns_ordering: RwLock::new(Vec::new()),
+
+            targets: DashMap::new(),
             targets_ordering: RwLock::new(Vec::new()),
         };
         let metro = Metronome {
@@ -185,6 +188,7 @@ impl CentralState {
     pub fn comm_drop_stream(&self, id: &TargetId) {
         self.app.comm_stream.remove(id);
     }
+    const CONN_TIMEOUT_DURATION: Duration = Duration::from_secs(3);
     pub fn comm_connect_stream_blocking(
         &self,
         id: TargetId,
@@ -211,23 +215,25 @@ impl CentralState {
             id: &id,
         };
         let addr: SocketAddr = addr.parse().ok()?;
-        let timeout = Duration::from_secs(3);
 
-        self.app.comm_stream.get(&id);
-        trace!("old comm stream removed");
+        self.app.comm_stream.remove(&id);
         let stream = match format {
             Format::WsBasedJson => {
-                let tcp_stream = TcpStream::connect_timeout(&addr, timeout).ok()?;
-                tcp_stream.set_read_timeout(Some(timeout)).ok()?;
-                tcp_stream.set_write_timeout(Some(timeout)).ok()?;
+                let tcp_stream =
+                    TcpStream::connect_timeout(&addr, Self::CONN_TIMEOUT_DURATION).ok()?;
+                tcp_stream
+                    .set_read_timeout(Some(Self::CONN_TIMEOUT_DURATION))
+                    .ok()?;
+                tcp_stream
+                    .set_write_timeout(Some(Self::CONN_TIMEOUT_DURATION))
+                    .ok()?;
 
-                trace!("trying to connect (websocket)");
                 let (ws, _) = ws::client(format!("ws://{}", addr), tcp_stream).ok()?;
                 CommStream::WebSocket(Box::new(ws))
             }
             Format::TcpBasedOsc => {
                 trace!("trying to connect (tcp)");
-                let stream = TcpStream::connect_timeout(&addr, timeout).ok()?;
+                let stream = TcpStream::connect_timeout(&addr, Self::CONN_TIMEOUT_DURATION).ok()?;
                 CommStream::TcpStream(stream)
             }
         };

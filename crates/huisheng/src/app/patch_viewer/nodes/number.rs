@@ -1,21 +1,11 @@
 use egui_snarl::{Snarl, ui::PinInfo};
 
 use crate::{
-    app::{
-        helpers::WidgetId,
-        patch_viewer::{
-            NodeType,
-            constants::{input_pin, output_pin},
-        },
+    app::patch_viewer::{
+        NodeType,
+        constants::{input_pin, output_pin},
     },
-    model::patch::{
-        Number,
-        node::{
-            PatchNode,
-            number::NumberNode,
-            oscillator::{Oscillator, Waveform},
-        },
-    },
+    model::patch::node::{PatchNode, number::NumberNode},
 };
 
 // LYN: Public Interface

@@ -8,16 +8,16 @@ use egui_snarl::ui::{PinPlacement, SnarlStyle, SnarlWidget};
 use lyn_util::{egui::text_color, types::WithId};
 
 use crate::{
-    app::patch_viewer::PatchViewerOutput,
+    app::{patch_viewer::PatchViewerOutput, widgets::error_modal::ErrorModal},
     model::{patch::Patch, state::CentralState},
-    routines::{RoutineId, guardian, processor},
+    routines::{RoutineId, guardian, listener, processor},
 };
 
 use self::{helpers::WidgetId, patch_viewer::PatchViewer, widgets::performance::Performance};
 
-pub mod helpers;
-pub mod patch_viewer;
-pub mod widgets;
+mod helpers;
+mod patch_viewer;
+mod widgets;
 
 // LYN: Main App State Holder
 
@@ -26,6 +26,7 @@ pub struct MainApp {
     // widget states
     performance: Performance,
 
+    // central state
     processor_cmd_tx: mpsc::Sender<processor::Command>,
     state: Arc<CentralState>,
 }
@@ -35,13 +36,22 @@ impl MainApp {
         let (processor_cmd_tx, processor_cmd_rx) = mpsc::channel();
         let state = Arc::new(CentralState::init());
 
-        let routines = vec![(
-            RoutineId::Processor,
-            thread::spawn({
-                let state = state.clone();
-                move || processor::main(state, processor_cmd_rx)
-            }),
-        )];
+        let routines = vec![
+            (
+                RoutineId::Processor,
+                thread::spawn({
+                    let state = state.clone();
+                    move || processor::main(state, processor_cmd_rx)
+                }),
+            ),
+            (
+                RoutineId::Listener,
+                thread::spawn({
+                    let state = state.clone();
+                    move || listener::main(state)
+                }),
+            ),
+        ];
         thread::spawn({
             let state = state.clone();
             move || guardian::main(state, routines)
@@ -52,6 +62,11 @@ impl MainApp {
             processor_cmd_tx,
             state,
         }
+    }
+
+    pub fn prepare_launch(&self, cc: &eframe::CreationContext<'_>) {
+        let egui_ctx = cc.egui_ctx.clone();
+        self.state.ui.ctx.set(egui_ctx).unwrap();
     }
 }
 
@@ -69,6 +84,9 @@ impl eframe::App for MainApp {
 
         self.draw_ui(ctx);
 
+        if let Some(msg) = self.state.app_get_err_msg().as_ref() {
+            ErrorModal::new(msg).draw(ctx);
+        }
         // ctx.request_repaint(); // Uncomment this for continuous repainting (fix some UI update issues)
     }
 }
@@ -80,7 +98,22 @@ impl MainApp {
                 ui.label("left");
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label("right");
+                    let mut port_guard = self.state.sheet_port_mut();
+                    let (port, public) = &mut *port_guard;
+
+                    ui.checkbox(public, "公开");
+                    if ui
+                        .add(
+                            egui::DragValue::new(port)
+                                .range(0..=u16::MAX)
+                                .speed(1)
+                                .prefix("端口 "),
+                        )
+                        .changed()
+                    {
+                        self.state.port_listener_stop();
+                    }
+
                     ui.separator();
                 });
             })
@@ -127,7 +160,9 @@ impl MainApp {
                     .show(snarl, &mut patch_viewer, ui);
                 let PatchViewerOutput { rebuild } = patch_viewer.output;
                 if rebuild {
-                    self.processor_cmd_tx.send(processor::Command::RebuildGraph);
+                    self.processor_cmd_tx
+                        .send(processor::Command::RebuildGraph)
+                        .expect("Processor commanding channel unexpectedly closed");
                 }
             });
     }
@@ -139,15 +174,15 @@ impl MainApp {
             .add_sized([ui.available_width(), 30.], egui::Button::new("添加音图"))
             .clicked()
         {
-            self.state.add_patch();
+            self.state.sheet_add_patch();
         };
 
         egui::ScrollArea::vertical().show(ui, |ui| {
             let mut to_be_removed = Vec::new();
             dnd(ui, WidgetId::MainAppExplorerPatchesOrderingDnd).show_vec(
-                &mut self.state.patches_ordering_mut(),
+                &mut self.state.sheet_patches_ordering_mut(),
                 |ui, patch_id, handle, _state| {
-                    let Some(arc) = self.state.get_patch(patch_id) else {
+                    let Some(arc) = self.state.sheet_get_patch(patch_id) else {
                         return;
                     };
                     let guard = arc.read();
@@ -192,7 +227,7 @@ impl MainApp {
                 },
             );
             for pat_id in to_be_removed {
-                self.state.del_patch(&pat_id);
+                self.state.sheet_del_patch(&pat_id);
             }
         });
     }

@@ -29,7 +29,7 @@ ws = { package = "tungstenite", version = "0.28.0", default-features = false }
 # Encoding
 serde = { version = "1.0", default-features = false }
 json = { package = "serde_json", version = "1.0", default-features = false }
-toml = { version = "0.9.10", default-features = false }
+# toml = { version = "0.9.10", default-features = false }
 osc = { package = "rosc", version = "0.11.4", default-features = false }
 # Misc
 lyn-util = { path = "crates/util" }
