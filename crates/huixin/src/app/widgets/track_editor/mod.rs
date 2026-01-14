@@ -5,7 +5,10 @@ use egui_dnd::dnd;
 use self::{track_header::TrackHeader, track_row::TrackRow};
 use crate::{
     app::{helpers::WidgetId, widgets::track_editor::constants::TRACK_HEADER_WIDTH},
-    model::{state::CentralState, track::SheetTrackType},
+    model::{
+        state::{CentralState, UiState},
+        track::SheetTrackType,
+    },
 };
 
 mod constants;
@@ -26,25 +29,7 @@ impl TrackEditor {
         egui::TopBottomPanel::top(WidgetId::TrackEditorTopPanel)
             .frame(egui::Frame::side_top_panel(ui.style()).inner_margin(emath::vec2(6., 4.)))
             .show_inside(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.allocate_ui_with_layout(
-                        emath::vec2(TRACK_HEADER_WIDTH - 12., 30.),
-                        egui::Layout::top_down(egui::Align::Min),
-                        |ui| {
-                            if ui
-                                .add_sized(
-                                    ui.available_size(),
-                                    egui::Button::new(egui::RichText::new("添加轨道")),
-                                )
-                                .clicked()
-                            {
-                                self.state.sheet_add_track(SheetTrackType::Pattern);
-                            };
-                        },
-                    );
-
-                    ui.separator();
-                });
+                self.topbar(ui);
             });
 
         egui::ScrollArea::vertical().show(ui, |ui| {
@@ -85,6 +70,35 @@ impl TrackEditor {
             for track_id in tracks_to_delete {
                 self.state.sheet_del_track(&track_id);
             }
+        });
+    }
+
+    fn topbar(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.allocate_ui_with_layout(
+                emath::vec2(TRACK_HEADER_WIDTH - 12., 30.),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| {
+                    if ui
+                        .add_sized(
+                            ui.available_size(),
+                            egui::Button::new(egui::RichText::new("添加轨道")),
+                        )
+                        .clicked()
+                    {
+                        self.state.sheet_add_track(SheetTrackType::Pattern);
+                    };
+                },
+            );
+
+            ui.separator();
+
+            ui.add(
+                egui::DragValue::new(&mut *self.state.ui.track_editor_size_per_beat.write())
+                    .range(UiState::MIN_SIZE_PER_BEAT..=UiState::MAX_SIZE_PER_BEAT)
+                    .speed(1)
+                    .prefix("缩放 "),
+            );
         });
     }
 }
