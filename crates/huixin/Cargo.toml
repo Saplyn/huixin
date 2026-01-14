@@ -16,7 +16,7 @@ ecolor = { workspace = true }
 emath = { workspace = true }
 egui-winit = { workspace = true }
 egui_dnd = { workspace = true }
-rfd = "0.16"
+rfd = "0.17"
 # Logging
 log = { workspace = true }
 simplelog = { workspace = true, features = ["termcolor"] }

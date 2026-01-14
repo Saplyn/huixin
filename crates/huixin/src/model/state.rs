@@ -364,6 +364,17 @@ impl CentralState {
         self.sheet.tracks.iter()
     }
 
+    pub fn sheet_min_length_in_beats(&self) -> u64 {
+        let mut ret = 0;
+        for track in self.sheet.tracks.iter() {
+            let track = track.value().read();
+            ret = ret.max(match &*track {
+                SheetTrack::Pattern(pat_track) => pat_track.beats(),
+            });
+        }
+        ret
+    }
+
     pub fn sheet_patterns_ordering_mut(&self) -> RwLockWriteGuard<'_, Vec<PatternId>> {
         self.sheet.patterns_ordering.write()
     }
@@ -373,6 +384,7 @@ impl CentralState {
     pub fn sheet_targets_ordering_mut(&self) -> RwLockWriteGuard<'_, Vec<TargetId>> {
         self.sheet.targets_ordering.write()
     }
+
     pub fn sheet_to_json_string_pretty(&self) -> Result<String, json::Error> {
         json::to_string_pretty(&self.sheet)
     }

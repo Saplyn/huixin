@@ -393,11 +393,11 @@ impl MainApp {
                 .prefix("BPM "),
         );
 
-        // TODO: impl actual context progress bar
+        // context progress bar
         let limit = self.state.metro_tick_limit();
         ui.add(
             egui::DragValue::new(self.state.sheet_length_in_beats_mut().deref_mut())
-                .range(1..=u64::MAX)
+                .range(self.state.sheet_min_length_in_beats()..=u64::MAX)
                 .prefix("Beats "),
         );
         ui.add(

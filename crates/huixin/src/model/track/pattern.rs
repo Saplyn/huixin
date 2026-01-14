@@ -79,10 +79,11 @@ impl PatternTrack {
 
     pub fn beats(&self) -> u64 {
         let last_tick = self.patterns.max_interval_end().map_or(0, |end| *end);
+        let beats = last_tick / TICK_PER_BEAT;
         if last_tick.is_multiple_of(TICK_PER_BEAT) {
-            last_tick
+            beats
         } else {
-            last_tick + (TICK_PER_BEAT - last_tick % TICK_PER_BEAT)
+            beats + 1
         }
     }
 }
