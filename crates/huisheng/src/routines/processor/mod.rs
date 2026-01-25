@@ -56,6 +56,7 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
         }
 
         let mut request_repaint = false;
+        let mut discard = false;
 
         // Topological process
         let mut output = [WireDataType::empty_block(); 2];
@@ -65,8 +66,12 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
             let patch_arc = state.sheet_get_patch(patch_id).unwrap();
             let mut patch_guard = patch_arc.write();
 
-            patch_guard.snarl[node_id].pre_process(state.clone());
-            request_repaint |= match patch_guard.snarl[node_id].get_type() {
+            let Some(node) = patch_guard.snarl.get_node_mut(node_id) else {
+                discard = true;
+                break;
+            };
+            node.pre_process(state.clone());
+            let process_result = match node.get_type() {
                 // Signal
                 PatchNodeType::Oscillator => {
                     Oscillator::process(node_id, &mut patch_guard.snarl, sample_rate)
@@ -84,6 +89,12 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
                     RemoteData::process(node_id, &mut patch_guard.snarl, ())
                 }
             };
+            if let Ok(repaint) = process_result {
+                request_repaint |= repaint;
+            } else {
+                discard = true;
+                break;
+            }
         }
 
         // Post process
@@ -94,8 +105,14 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
             patch_guard.snarl[node_id].post_process();
         }
 
+        // Handle potential repaint
         if request_repaint && let Some(ctx) = state.ui.ctx.get() {
             ctx.request_repaint();
+        }
+
+        // Discard this pass on error
+        if discard {
+            continue;
         }
 
         // Send output block to audio stream

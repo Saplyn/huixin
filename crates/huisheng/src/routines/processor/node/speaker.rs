@@ -5,13 +5,18 @@ use crate::{
         Block,
         node::{PatchNode, PatchNodeTrait, speaker::Speaker},
     },
+    node_or_bail,
     routines::processor::node::PatchNodeProcessable,
 };
 
 impl<'output> PatchNodeProcessable<'output> for Speaker {
     type ProcessArg = &'output mut [Block; 2];
-    fn process(node_id: NodeId, snarl: &mut Snarl<PatchNode>, output: Self::ProcessArg) -> bool {
-        let PatchNode::Speaker(speaker) = &mut snarl[node_id] else {
+    fn process(
+        node_id: NodeId,
+        snarl: &mut Snarl<PatchNode>,
+        output: Self::ProcessArg,
+    ) -> Result<bool, ()> {
+        let PatchNode::Speaker(speaker) = node_or_bail!(mut snarl, node_id) else {
             unreachable!();
         };
 
@@ -29,18 +34,22 @@ impl<'output> PatchNodeProcessable<'output> for Speaker {
             .collect::<Vec<_>>();
 
         for src in left_chan_src {
-            let block = snarl[src.node].output_block(src.output).unwrap();
+            let block = node_or_bail!(snarl, src.node)
+                .output_block(src.output)
+                .unwrap();
             output[0].iter_mut().zip(block).for_each(|(frame, samp)| {
                 *frame += *samp;
             });
         }
         for src in right_chan_src {
-            let block = snarl[src.node].output_block(src.output).unwrap();
+            let block = node_or_bail!(snarl, src.node)
+                .output_block(src.output)
+                .unwrap();
             output[1].iter_mut().zip(block).for_each(|(frame, samp)| {
                 *frame += *samp;
             });
         }
 
-        false
+        Ok(false)
     }
 }
