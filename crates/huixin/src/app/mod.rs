@@ -1,6 +1,7 @@
 use std::{
     fs,
     ops::DerefMut,
+    path::PathBuf,
     sync::{Arc, mpsc},
     thread,
     time::Duration,
@@ -9,7 +10,7 @@ use std::{
 use egui::containers::menu::MenuButton;
 use egui_dnd::dnd;
 use log::warn;
-use lyn_util::egui::text_color;
+use lyn_util::{egui::text_color, persist::AppStore};
 
 use self::{
     helpers::WidgetId,
@@ -20,11 +21,9 @@ use self::{
     widgets::{error_modal::ErrorModal, performance::Performance},
 };
 use crate::{
-    APP_ID,
     app::{tools::ToolWindowId, widgets::track_editor::TrackEditor},
     model::{
         pattern::{SheetPatternTrait, SheetPatternType},
-        persistence::{AppStorage, WorkingDirectory},
         state::{CentralState, UiState},
     },
     routines::{RoutineId, guardian, instructor, metronome, sheet_reader},
@@ -45,9 +44,6 @@ pub enum PlayerContext {
 
 #[derive(Debug)]
 pub struct MainApp {
-    // app states
-    working_directory: Option<WorkingDirectory>,
-
     // widget states
     performance: Performance,
     tools: Vec<Box<dyn ToolWindow>>,
@@ -97,59 +93,62 @@ impl MainApp {
         });
 
         Self {
-            working_directory: None,
             performance: Default::default(),
             track_editor: TrackEditor::new(state.clone()),
             tools,
             state,
         }
     }
-    fn persist_sheet(&self) {
-        let Some(cwd) = self.working_directory.as_ref() else {
-            return;
-        };
+    // (safe to call if `working_directory` is `None`)
+    fn persist_sheet_blocking(&self) -> Result<(), ()> {
+        let project_guard = self.state.get_project();
+        let project = project_guard.as_ref().ok_or(())?;
 
-        self.state.worker_spawn_task({
-            let file_content = self.state.sheet_to_json_string_pretty().unwrap();
-            let file = cwd.state_path(APP_ID);
-            move || {
-                if let Err(e) = fs::create_dir_all(file.parent().unwrap()) {
-                    warn!("Failed to create directories for state persistence: {}", e);
-                    return;
-                }
-                if let Err(e) = fs::write(&file, file_content) {
-                    warn!("Failed to persist state to file {:?}: {}", file, e);
-                }
-            }
-        });
+        let sheet_file_content = self.state.sheet_to_ron_string_pretty().map_err(|_| ())?;
+        let sheet_file_path = project.sheet_file();
+
+        fs::create_dir_all(sheet_file_path.parent().unwrap()).map_err(|e| {
+            warn!("Failed to create directories for sheet persistence: {}", e);
+        })?;
+        fs::write(&sheet_file_path, sheet_file_content).map_err(|e| {
+            warn!(
+                "Failed to persist sheet to file {:?}: {}",
+                sheet_file_path, e
+            );
+        })?;
+
+        Ok(())
     }
-    fn restore_sheet(&self) {
-        // read the file, use `self.state.sheet_from_json_str` to restore the state
-        let Some(cwd) = self.working_directory.as_ref() else {
-            return;
-        };
-        let state_file = cwd.state_path(APP_ID);
-        if state_file.exists() {
-            match fs::read_to_string(&state_file) {
-                Ok(str) => {
-                    if let Err(e) = self.state.sheet_from_json_str(&str) {
-                        warn!(
-                            "Failed to restore persisted state from file {:?}: {}",
-                            state_file, e
-                        );
-                    };
-                }
-                Err(e) => {
-                    warn!(
-                        "Failed to restore persisted state from file {:?}: {}",
-                        state_file, e
-                    );
-                }
-            }
+    // (safe to call if `working_directory` is `None`)
+    fn restore_sheet_blocking(&self) -> Result<(), ()> {
+        let project_guard = self.state.get_project();
+        let project = project_guard.as_ref().ok_or(())?;
+
+        let state_file = project.sheet_file();
+        if !state_file.exists() {
+            warn!(
+                "No persisted sheet file found at {:?}, skipping restore.",
+                state_file
+            );
+            return Err(());
         }
+        let str = fs::read_to_string(&state_file).map_err(|e| {
+            warn!(
+                "Failed to read persisted sheet from file {:?}: {}",
+                state_file, e
+            );
+        })?;
+        self.state.sheet_from_ron_str(&str).map_err(|e| {
+            warn!(
+                "Failed to restore persisted state from file {:?}: {}",
+                state_file, e
+            );
+        })?;
+
+        Ok(())
     }
 
-    const STORAGE_KEY_CWD: &str = "working-directory";
+    const STORAGE_KEY_PROJECT_DIR: &str = "project-directory";
     pub fn prepare_launch(&mut self, cc: &eframe::CreationContext<'_>) {
         let egui_ctx = cc.egui_ctx.clone();
         self.state.ui.ctx.set(egui_ctx).unwrap();
@@ -158,21 +157,23 @@ impl MainApp {
             return;
         };
 
-        self.working_directory =
-            eframe::get_value(storage, &AppStorage::key(Self::STORAGE_KEY_CWD)).unwrap_or_default();
-
-        self.restore_sheet();
+        let dir: Option<PathBuf> =
+            eframe::get_value(storage, &AppStore::key(Self::STORAGE_KEY_PROJECT_DIR))
+                .unwrap_or_default();
+        if let Some(dir) = dir {
+            self.state.load_project(dir);
+        }
 
         for tool in self.tools.iter_mut() {
-            let key = AppStorage::key(tool.tool_id().to_string());
+            let key = AppStore::key(tool.tool_id().to_string());
             let open = eframe::get_value(storage, &key).unwrap_or_default();
             *tool.window_open_mut() = open;
         }
         *self.state.ui.track_editor_size_per_beat.write() =
-            eframe::get_value(storage, &AppStorage::key(UiState::STORAGE_KEY_TRACK_SPB))
+            eframe::get_value(storage, &AppStore::key(UiState::STORAGE_KEY_TRACK_SPB))
                 .unwrap_or(UiState::MIN_SIZE_PER_BEAT);
         *self.state.ui.pattern_editor_size_per_beat.write() =
-            eframe::get_value(storage, &AppStorage::key(UiState::STORAGE_KEY_PATTERN_SPB))
+            eframe::get_value(storage, &AppStore::key(UiState::STORAGE_KEY_PATTERN_SPB))
                 .unwrap_or(UiState::MIN_SIZE_PER_BEAT);
     }
 }
@@ -189,15 +190,18 @@ impl eframe::App for MainApp {
             self.state.player_set_context(PlayerContext::Sheet);
         }
 
-        if self.working_directory.is_none() {
+        if self.state.get_project().is_none() {
             self.draw_placeholder_ui(ctx);
         } else {
+            if !self.state.sheet_loaded() {
+                self.restore_sheet_blocking();
+            }
             self.draw_studio_ui(ctx);
             self.draw_active_tool_windows(ctx);
         }
 
         if ctx.input(|i| i.key_pressed(egui::Key::S) && (i.modifiers.ctrl || i.modifiers.command)) {
-            self.persist_sheet();
+            self.persist_sheet_blocking();
         }
 
         if let Some(msg) = self.state.app_get_err_msg().as_ref() {
@@ -209,24 +213,28 @@ impl eframe::App for MainApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(
             storage,
-            &AppStorage::key(Self::STORAGE_KEY_CWD),
-            &self.working_directory,
+            &AppStore::key(Self::STORAGE_KEY_PROJECT_DIR),
+            &self
+                .state
+                .get_project()
+                .as_ref()
+                .map(|project| &project.project_dir),
         );
         for tool in self.tools.iter() {
             eframe::set_value(
                 storage,
-                &AppStorage::key(tool.tool_id().to_string()),
+                &AppStore::key(tool.tool_id().to_string()),
                 &tool.window_open(),
             );
         }
         eframe::set_value(
             storage,
-            &AppStorage::key(UiState::STORAGE_KEY_TRACK_SPB),
+            &AppStore::key(UiState::STORAGE_KEY_TRACK_SPB),
             &self.state.ui.track_editor_size_per_beat,
         );
         eframe::set_value(
             storage,
-            &AppStorage::key(UiState::STORAGE_KEY_PATTERN_SPB),
+            &AppStore::key(UiState::STORAGE_KEY_PATTERN_SPB),
             &self.state.ui.pattern_editor_size_per_beat,
         );
     }
@@ -238,15 +246,42 @@ impl eframe::App for MainApp {
 
 impl MainApp {
     fn draw_placeholder_ui(&mut self, ctx: &egui::Context) {
+        fn select_working_dir(state: &CentralState) {
+            struct ScopeGuard<'state> {
+                state: &'state CentralState,
+            }
+            impl<'state> Drop for ScopeGuard<'state> {
+                fn drop(&mut self) {
+                    *self.state.ui.selecting_project_dir.write() = false;
+                }
+            }
+
+            let _guard = ScopeGuard { state };
+            let Some(project_dir) = rfd::FileDialog::new().pick_folder() else {
+                return;
+            };
+            if let Err(err) = state.load_project(project_dir) {
+                warn!("Failed to load project: {}", err);
+            }
+        }
+
         egui::CentralPanel::default().show(ctx, |ui| {
+            if *self.state.ui.selecting_project_dir.read() {
+                ui.disable();
+            }
+
             ui.vertical_centered(|ui| {
                 ui.add_space(ui.available_height() / 2.0 - 12.0);
                 if ui
                     .button(egui::RichText::new("选择工作目录").heading())
                     .clicked()
                 {
-                    // FIXME:
-                    self.working_directory = rfd::FileDialog::new().pick_folder().map(|p| p.into());
+                    *self.state.ui.selecting_project_dir.write() = true;
+                    ctx.request_repaint();
+                    self.state.worker_spawn_task({
+                        let state = self.state.clone();
+                        move || select_working_dir(&state)
+                    });
                 }
             });
         });
@@ -312,7 +347,7 @@ impl MainApp {
     fn app_menu(&mut self, ui: &mut egui::Ui) {
         MenuButton::from_button(egui::Button::new("󰍜 ").frame_when_inactive(false)).ui(ui, |ui| {
             if ui.button("保存").clicked() {
-                self.persist_sheet();
+                self.persist_sheet_blocking();
                 ui.close();
             }
         });

@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     hash::{DefaultHasher, Hash, Hasher},
-    sync::atomic::{AtomicU64, AtomicUsize, Ordering},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 use egui::{
@@ -91,7 +91,7 @@ impl std::hash::Hash for LynId {
     }
 }
 
-// LYN: Coloring
+// LYN: Colouring
 
 pub fn text_color(bg: ecolor::Color32) -> ecolor::Color32 {
     let [r, g, b, _] = bg.to_array();

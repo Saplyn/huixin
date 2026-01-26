@@ -9,7 +9,7 @@ use crate::{
         patch::{
             Number, WireDataType,
             node::{
-                PatchNode, PatchNodeTrait, PatchNodeType, bang::BangNode, number::NumberNode,
+                PatchNodeTrait, PatchNodeType, bang::BangNode, number::NumberNode,
                 oscillator::Oscillator, remote_data::RemoteData, speaker::Speaker,
             },
         },

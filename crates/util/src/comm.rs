@@ -3,7 +3,11 @@ use std::{fmt::Display, ops};
 use osc::{OscMessage, OscPacket};
 use serde::{Deserialize, Serialize};
 
+// LYN: Types
+
 pub type DataMap = json::Map<String, json::Value>;
+
+// LYN: Instruction Format
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Format {
@@ -26,6 +30,8 @@ impl Format {
         &[Format::WsBasedJson, Format::TcpBasedOsc]
     }
 }
+
+// LYN: Instruction Payload
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Instruction {

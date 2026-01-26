@@ -1,14 +1,15 @@
 use std::{
-    io::Write,
+    io::{self, Write},
     net::{SocketAddr, TcpStream},
     num::NonZero,
+    path::{Path, PathBuf},
     sync::{Arc, OnceLock},
     time::Duration,
 };
 
 use dashmap::{DashMap, DashSet, mapref::one::Ref};
 use log::trace;
-use lyn_util::{comm::Format, egui::LynId, types::WithId};
+use lyn_util::{comm::Format, egui::LynId, project::Project, types::WithId};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use serde::{Deserialize, Serialize};
@@ -65,6 +66,7 @@ pub struct UiState {
     pub ctx: OnceLock<egui::Context>,
     pub track_editor_size_per_beat: RwLock<f32>,
     pub pattern_editor_size_per_beat: RwLock<f32>,
+    pub selecting_project_dir: RwLock<bool>,
 }
 
 impl UiState {
@@ -77,6 +79,8 @@ impl UiState {
 
 #[derive(Debug)]
 pub struct App {
+    project: RwLock<Option<Project>>,
+    sheet_loaded: RwLock<bool>,
     err_modal_message: RwLock<Option<String>>,
     selected_pattern: RwLock<Option<PatternId>>,
     player_context: RwLock<PlayerContext>,
@@ -109,6 +113,8 @@ pub struct Sheet {
 impl CentralState {
     pub fn init() -> Self {
         let app = App {
+            project: RwLock::new(None),
+            sheet_loaded: RwLock::new(false),
             err_modal_message: RwLock::new(None),
             selected_pattern: RwLock::new(None),
             player_context: RwLock::new(PlayerContext::Sheet),
@@ -119,6 +125,7 @@ impl CentralState {
             ctx: OnceLock::new(),
             track_editor_size_per_beat: RwLock::new(UiState::MIN_SIZE_PER_BEAT),
             pattern_editor_size_per_beat: RwLock::new(UiState::MIN_SIZE_PER_BEAT),
+            selecting_project_dir: RwLock::new(false),
         };
         let sheet = Sheet {
             bpm: RwLock::new(130.),
@@ -152,6 +159,15 @@ impl CentralState {
 // LYN: State APIs
 
 impl CentralState {
+    pub fn load_project(&self, project_dir: PathBuf) -> Result<(), io::Error> {
+        let project = Project::load(project_dir)?;
+        self.app.project.write().replace(project);
+        *self.app.sheet_loaded.write() = false;
+        Ok(())
+    }
+    pub fn get_project(&self) -> RwLockReadGuard<'_, Option<Project>> {
+        self.app.project.read()
+    }
     pub fn selected_pattern_id(&self) -> RwLockReadGuard<'_, Option<PatternId>> {
         self.app.selected_pattern.read()
     }
@@ -200,17 +216,17 @@ impl CentralState {
         }
         self.app.comm_stream_connecting.insert(id.clone());
 
-        struct Guard<'state, 'id> {
+        struct ScopeGuard<'state, 'id> {
             state: &'state CentralState,
             id: &'id TargetId,
         }
-        impl<'state, 'id> Drop for Guard<'state, 'id> {
+        impl<'state, 'id> Drop for ScopeGuard<'state, 'id> {
             fn drop(&mut self) {
                 self.state.app.comm_stream_connecting.remove(self.id);
             }
         }
 
-        let _guard = Guard {
+        let _guard = ScopeGuard {
             state: self,
             id: &id,
         };
@@ -385,11 +401,14 @@ impl CentralState {
         self.sheet.targets_ordering.write()
     }
 
-    pub fn sheet_to_json_string_pretty(&self) -> Result<String, json::Error> {
-        json::to_string_pretty(&self.sheet)
+    pub fn sheet_loaded(&self) -> bool {
+        *self.app.sheet_loaded.read()
     }
-    pub fn sheet_from_json_str(&self, s: &str) -> Result<(), json::Error> {
-        let sheet: Sheet = json::from_str(s)?;
+    pub fn sheet_to_ron_string_pretty(&self) -> Result<String, ron::Error> {
+        ron::ser::to_string_pretty(&self.sheet, ron::ser::PrettyConfig::default())
+    }
+    pub fn sheet_from_ron_str(&self, s: &str) -> Result<(), ron::Error> {
+        let sheet: Sheet = ron::from_str(s)?;
         *self.sheet.bpm.write() = *sheet.bpm.read();
         *self.sheet.length_in_beats.write() = *sheet.length_in_beats.read();
         self.sheet.tracks.clear();

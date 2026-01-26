@@ -3,6 +3,8 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+// LYN: `WithId` Type
+
 #[derive(Debug, Clone)]
 pub struct WithId<I, T> {
     pub id: I,

@@ -15,6 +15,9 @@ ws = { workspace = true, features = ["default"] }
 # Encoding
 serde = { workspace = true }
 json = { workspace = true, features = ["default"] }
+toml = { workspace = true, features = ["default"] }
+ron = { workspace = true, features = ["default"] }
 osc = { workspace = true, features = ["default"] }
+semver = { version = "1.0", features = ["serde"] }
 # Misc
 rand = "0.9"

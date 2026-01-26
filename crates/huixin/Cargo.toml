@@ -24,12 +24,14 @@ simplelog = { workspace = true, features = ["termcolor"] }
 parking_lot = { workspace = true, features = ["serde"] }
 dashmap = { workspace = true, features = ["serde"] }
 rayon = { workspace = true }
-interavl = { git = "https://github.com/Saplyn/interavl.git" }
+interavl = { version = "0.5" }
 # Communication
 ws = { workspace = true, features = ["default"] }
 # Encoding
 serde = { workspace = true }
 json = { workspace = true, features = ["default"] }
+toml = { workspace = true, features = ["default"] }
+ron = { workspace = true, features = ["default"] }
 # Misc
 either = { workspace = true, features = ["default"] }
 lyn-util = { workspace = true }

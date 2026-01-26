@@ -1,6 +1,5 @@
 pub mod comm;
 pub mod pattern;
-pub mod persistence;
 pub mod state;
 pub mod track;
 
