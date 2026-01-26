@@ -467,6 +467,9 @@ impl CentralState {
         for id in target_id_set {
             self.sheet.targets_ordering.write().push(id);
         }
+
+        *self.app.sheet_loaded.write() = true;
+
         Ok(())
     }
 }

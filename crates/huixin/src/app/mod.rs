@@ -9,7 +9,7 @@ use std::{
 
 use egui::containers::menu::MenuButton;
 use egui_dnd::dnd;
-use log::warn;
+use log::{info, warn};
 use lyn_util::{egui::text_color, persist::AppStore};
 
 use self::{
