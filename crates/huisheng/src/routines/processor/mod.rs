@@ -9,8 +9,9 @@ use crate::{
         patch::{
             Number, WireDataType,
             node::{
-                PatchNodeTrait, PatchNodeType, bang::BangNode, number::NumberNode,
-                oscillator::Oscillator, remote_data::RemoteData, speaker::Speaker,
+                PatchNodeTrait, PatchNodeType, bang::BangNode, midi_to_freq::MidiToFreq,
+                number::NumberNode, oscillator::Oscillator, remote_data::RemoteData,
+                speaker::Speaker,
             },
         },
         state::{CentralState, PatchId},
@@ -55,11 +56,6 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
             }
         }
 
-        if !state.dsp_active() {
-            stream_audio_block(&output_tx, [WireDataType::empty_block(); 2]);
-            continue;
-        }
-
         let mut request_repaint = false;
         let mut discard = false;
 
@@ -88,6 +84,11 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
                 // Variable
                 PatchNodeType::Number => NumberNode::process(node_id, &mut patch_guard.snarl, ()),
                 PatchNodeType::Bang => BangNode::process(node_id, &mut patch_guard.snarl, ()),
+
+                // Calculation
+                PatchNodeType::MidiToFreq => {
+                    MidiToFreq::process(node_id, &mut patch_guard.snarl, ())
+                }
 
                 // Communication
                 PatchNodeType::RemoteData => {
@@ -121,7 +122,11 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
         }
 
         // Send output block to audio stream
-        stream_audio_block(&output_tx, output);
+        if !state.dsp_active() {
+            stream_audio_block(&output_tx, [WireDataType::empty_block(); 2]);
+        } else {
+            stream_audio_block(&output_tx, output);
+        }
     }
 }
 

@@ -5,21 +5,20 @@ use egui_snarl::{
     Snarl,
     ui::{SnarlPin, SnarlViewer},
 };
-use log::info;
 
 use crate::model::{
     patch::{
         WireDataType,
         node::{
-            PatchNode, PatchNodeTrait, PatchNodeType, bang::BangNode, number::NumberNode,
-            oscillator::Oscillator, remote_data::RemoteData, speaker::Speaker,
+            PatchNode, PatchNodeTrait, PatchNodeType, bang::BangNode, midi_to_freq::MidiToFreq,
+            number::NumberNode, oscillator::Oscillator, remote_data::RemoteData, speaker::Speaker,
         },
     },
     state::CentralState,
 };
 
 mod constants;
-mod nodes;
+mod node;
 
 #[derive(Debug)]
 pub struct PatchViewer {
@@ -166,6 +165,9 @@ impl SnarlViewer<NodeType> for PatchViewer {
             PatchNodeType::Number => NumberNode::pin_input(pin, ui, snarl, pin.id.input),
             PatchNodeType::Bang => BangNode::pin_input(pin, ui, snarl, pin.id.input),
 
+            // Calculation
+            PatchNodeType::MidiToFreq => MidiToFreq::pin_input(pin, ui, snarl, pin.id.input),
+
             // Communication
             PatchNodeType::RemoteData => RemoteData::pin_input(pin, ui, snarl, pin.id.input),
         }
@@ -187,6 +189,9 @@ impl SnarlViewer<NodeType> for PatchViewer {
             // Variable
             PatchNodeType::Number => NumberNode::pin_output(pin, ui, snarl, pin.id.output),
             PatchNodeType::Bang => BangNode::pin_output(pin, ui, snarl, pin.id.output),
+
+            // Calculation
+            PatchNodeType::MidiToFreq => MidiToFreq::pin_output(pin, ui, snarl, pin.id.output),
 
             // Communication
             PatchNodeType::RemoteData => RemoteData::pin_output(pin, ui, snarl, pin.id.output),
@@ -229,7 +234,8 @@ impl SnarlViewer<NodeType> for PatchViewer {
             if ui.button("ADSR 曲线").clicked() {
                 ui.close();
             }
-            if ui.button("MIDI 转频率").clicked() {
+            if ui.button(MidiToFreq::NAME).clicked() {
+                self.insert_node(snarl, pos, PatchNode::MidiToFreq(MidiToFreq::new()));
                 ui.close();
             }
         });
