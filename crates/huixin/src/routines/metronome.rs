@@ -1,6 +1,6 @@
 use std::{cmp, sync::Arc, thread, time::Duration};
 
-use log::{info, trace};
+use log::info;
 
 use crate::model::state::CentralState;
 

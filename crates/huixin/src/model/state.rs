@@ -2,7 +2,7 @@ use std::{
     io::{self, Write},
     net::{SocketAddr, TcpStream},
     num::NonZero,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Arc, OnceLock},
     time::Duration,
 };
