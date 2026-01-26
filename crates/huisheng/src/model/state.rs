@@ -3,16 +3,17 @@ use std::{
     fmt::Debug,
     io,
     net::{TcpListener, TcpStream},
+    path::PathBuf,
     sync::{Arc, OnceLock},
 };
 
 use cpal::traits::{DeviceTrait, HostTrait};
 use dashmap::{
-    DashMap, DashSet,
+    DashMap,
     iter::{Iter, IterMut},
     mapref::one::{Ref, RefMut},
 };
-use lyn_util::{egui::LynId, types::WithId};
+use lyn_util::{egui::LynId, project::Project, types::WithId};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use serde::{Deserialize, Serialize};
@@ -43,10 +44,14 @@ pub struct CentralState {
 #[derive(Debug)]
 pub struct UiState {
     pub ctx: OnceLock<egui::Context>,
+    pub selecting_project_dir: RwLock<bool>,
 }
 
 #[derive(Debug)]
 pub struct App {
+    project: RwLock<Option<Project>>,
+    states_loaded: RwLock<bool>,
+    dsp_active: RwLock<bool>,
     err_modal_message: RwLock<Option<String>>,
     selected_patch: RwLock<Option<PatchId>>,
 }
@@ -64,6 +69,13 @@ pub struct Sheet {
 
     patches: DashMap<PatchId, Arc<RwLock<Patch>>>,
     patches_ordering: RwLock<Vec<PatchId>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PersistedState {
+    pub port: (u16 /* port */, bool /* public */),
+    pub name_id_mapping: HashMap<String /* name */, PatchId>,
+    pub ordering: Vec<PatchId>,
 }
 
 pub struct CpalState {
@@ -94,6 +106,7 @@ impl CentralState {
 
         let ui = UiState {
             ctx: OnceLock::new(),
+            selecting_project_dir: RwLock::new(false),
         };
         let cpal = CpalState {
             host,
@@ -113,6 +126,9 @@ impl CentralState {
         };
 
         let app = App {
+            project: RwLock::new(None),
+            states_loaded: RwLock::new(false),
+            dsp_active: RwLock::new(false),
             err_modal_message: RwLock::new(None),
             selected_patch: RwLock::new(None),
         };
@@ -131,6 +147,19 @@ impl CentralState {
 // LYN: State APIs
 
 impl CentralState {
+    pub fn load_project(&self, project_dir: PathBuf) -> Result<(), io::Error> {
+        let project = Project::load(project_dir)?;
+        self.app.project.write().replace(project);
+        *self.app.states_loaded.write() = false;
+        Ok(())
+    }
+    pub fn get_project(&self) -> RwLockReadGuard<'_, Option<Project>> {
+        self.app.project.read()
+    }
+    pub fn close_project(&self) {
+        self.app.project.write().take();
+        *self.app.states_loaded.write() = false;
+    }
     pub fn worker_spawn_task(&self, f: impl FnOnce() + Send + 'static) {
         self.workers.spawn(f);
     }
@@ -145,6 +174,13 @@ impl CentralState {
     }
     pub fn select_patch(&self, id: Option<PatchId>) {
         *self.app.selected_patch.write() = id;
+    }
+
+    pub fn dsp_active(&self) -> bool {
+        *self.app.dsp_active.read()
+    }
+    pub fn dsp_value_mut(&self) -> RwLockWriteGuard<'_, bool> {
+        self.app.dsp_active.write()
     }
 
     pub fn app_set_err_msg(&self, msg: Option<String>) {
@@ -246,5 +282,67 @@ impl CentralState {
     }
     pub fn sheet_port(&self) -> (u16, bool) {
         *self.sheet.port.read()
+    }
+
+    pub fn states_loaded(&self) -> bool {
+        *self.app.states_loaded.read()
+    }
+    pub fn sheet_to_persisted(&self) -> (HashMap<String, Arc<RwLock<Patch>>>, PersistedState) {
+        let mut patches = HashMap::new();
+        let mut name_id_mapping = HashMap::new();
+        for entry in self.sheet.patches.iter() {
+            let id = entry.key().clone();
+            let name = entry
+                .value()
+                .read()
+                .name
+                .clone()
+                .replace('/', "_")
+                .replace('\\', "_");
+
+            let (mut store_name, mut suffix) = (name.clone(), 0);
+            while patches.contains_key(&store_name) {
+                store_name = format!("{} {}", name, suffix + 1);
+                suffix += 1;
+            }
+
+            patches.insert(store_name.clone(), entry.value().clone());
+            name_id_mapping.insert(store_name, id);
+        }
+
+        (
+            patches,
+            PersistedState {
+                port: *self.sheet.port.read(),
+                name_id_mapping,
+                ordering: self.sheet.patches_ordering.read().clone(),
+            },
+        )
+    }
+    pub fn sheet_from_persisted(
+        &self,
+        persisted: PersistedState,
+        mut patches: HashMap<String, Arc<RwLock<Patch>>>,
+    ) {
+        *self.sheet.port.write() = persisted.port;
+
+        self.sheet.patches.clear();
+        for (name, id) in persisted.name_id_mapping {
+            if let Some(patch) = patches.remove(&name) {
+                self.sheet.patches.insert(id, patch);
+            }
+        }
+
+        *self.sheet.patches_ordering.write() = persisted.ordering.clone();
+        let mut patch_id_set: std::collections::HashSet<_> =
+            self.sheet.patches.iter().map(|e| e.key().clone()).collect();
+        for id in self.sheet.patches_ordering.read().iter() {
+            patch_id_set.remove(id);
+        }
+        for id in patch_id_set {
+            self.sheet.patches_ordering.write().push(id);
+        }
+
+        *self.app.states_loaded.write() = true;
     }
 }

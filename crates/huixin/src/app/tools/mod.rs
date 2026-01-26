@@ -20,13 +20,12 @@ pub enum ToolWindowId {
     Tester,
 }
 
-impl Display for ToolWindowId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            ToolWindowId::PatternEditor => "Pattern Editor",
-            ToolWindowId::ConnectionManager => "Connection Manager",
-            ToolWindowId::Tester => "Tester",
-        };
-        write!(f, "{}", s)
+impl ToolWindowId {
+    pub fn to_store_key(&self) -> &'static str {
+        match self {
+            ToolWindowId::PatternEditor => "tool-pattern-editor",
+            ToolWindowId::ConnectionManager => "tool-connection-manager",
+            ToolWindowId::Tester => "tool-tester",
+        }
     }
 }

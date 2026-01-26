@@ -10,12 +10,13 @@ chrono = { workspace = true, features = ["clock"] }
 
 [dependencies]
 # EGUI
-eframe = { workspace = true, features = ["default"] }
+eframe = { workspace = true, features = ["default", "persistence"] }
 egui = { workspace = true }
 ecolor = { workspace = true }
 emath = { workspace = true }
 egui_dnd = { workspace = true }
 egui-snarl = { version = "0.9", features = ["serde"] }
+rfd = { workspace = true, features = ["default"] }
 # Media
 dasp = { version = "0.11", features = ["all"] }
 cpal = "0.17"

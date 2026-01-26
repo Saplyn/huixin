@@ -1,6 +1,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use egui_snarl::{InPinId, NodeId, OutPinId};
+use serde::{Deserialize, Serialize};
 
 use crate::model::{
     data_mem::NonBlockData,
@@ -22,7 +23,7 @@ pub mod speaker;
 
 // LYN: Snarl Node Impl
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum PatchNode {
     // Signal
     Oscillator(Box<Oscillator>),

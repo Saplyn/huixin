@@ -168,6 +168,10 @@ impl CentralState {
     pub fn get_project(&self) -> RwLockReadGuard<'_, Option<Project>> {
         self.app.project.read()
     }
+    pub fn close_project(&self) {
+        self.app.project.write().take();
+        *self.app.sheet_loaded.write() = false;
+    }
     pub fn selected_pattern_id(&self) -> RwLockReadGuard<'_, Option<PatternId>> {
         self.app.selected_pattern.read()
     }

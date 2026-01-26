@@ -99,54 +99,6 @@ impl MainApp {
             state,
         }
     }
-    // (safe to call if `working_directory` is `None`)
-    fn persist_sheet_blocking(&self) -> Result<(), ()> {
-        let project_guard = self.state.get_project();
-        let project = project_guard.as_ref().ok_or(())?;
-
-        let sheet_file_content = self.state.sheet_to_ron_string_pretty().map_err(|_| ())?;
-        let sheet_file_path = project.sheet_file();
-
-        fs::create_dir_all(sheet_file_path.parent().unwrap()).map_err(|e| {
-            warn!("Failed to create directories for sheet persistence: {}", e);
-        })?;
-        fs::write(&sheet_file_path, sheet_file_content).map_err(|e| {
-            warn!(
-                "Failed to persist sheet to file {:?}: {}",
-                sheet_file_path, e
-            );
-        })?;
-
-        Ok(())
-    }
-    // (safe to call if `working_directory` is `None`)
-    fn restore_sheet_blocking(&self) -> Result<(), ()> {
-        let project_guard = self.state.get_project();
-        let project = project_guard.as_ref().ok_or(())?;
-
-        let state_file = project.sheet_file();
-        if !state_file.exists() {
-            warn!(
-                "No persisted sheet file found at {:?}, skipping restore.",
-                state_file
-            );
-            return Err(());
-        }
-        let str = fs::read_to_string(&state_file).map_err(|e| {
-            warn!(
-                "Failed to read persisted sheet from file {:?}: {}",
-                state_file, e
-            );
-        })?;
-        self.state.sheet_from_ron_str(&str).map_err(|e| {
-            warn!(
-                "Failed to restore persisted state from file {:?}: {}",
-                state_file, e
-            );
-        })?;
-
-        Ok(())
-    }
 
     const STORAGE_KEY_PROJECT_DIR: &str = "project-directory";
     pub fn prepare_launch(&mut self, cc: &eframe::CreationContext<'_>) {
@@ -165,7 +117,7 @@ impl MainApp {
         }
 
         for tool in self.tools.iter_mut() {
-            let key = AppStore::key(tool.tool_id().to_string());
+            let key = AppStore::key(tool.tool_id().to_store_key());
             let open = eframe::get_value(storage, &key).unwrap_or_default();
             *tool.window_open_mut() = open;
         }
@@ -175,6 +127,58 @@ impl MainApp {
         *self.state.ui.pattern_editor_size_per_beat.write() =
             eframe::get_value(storage, &AppStore::key(UiState::STORAGE_KEY_PATTERN_SPB))
                 .unwrap_or(UiState::MIN_SIZE_PER_BEAT);
+    }
+
+    // (safe to call if `working_directory` is `None`)
+    fn persist_sheet_blocking(&self) -> Result<(), ()> {
+        let project_guard = self.state.get_project();
+        let project = project_guard.as_ref().ok_or(())?;
+
+        let sheet_file_content = self.state.sheet_to_ron_string_pretty().map_err(|_| ())?;
+        let sheet_file_path = project.sheet_file();
+
+        if let Some(parent) = sheet_file_path.parent() {
+            fs::create_dir_all(parent).map_err(|e| {
+                warn!("Failed to create directories for sheet persistence: {}", e);
+            })?;
+        }
+        fs::write(&sheet_file_path, sheet_file_content).map_err(|e| {
+            warn!(
+                "Failed to persist sheet to file {:?}: {}",
+                sheet_file_path, e
+            );
+        })?;
+
+        Ok(())
+    }
+    // (safe to call if `working_directory` is `None`)
+    fn restore_sheet_blocking(&self) -> Result<(), ()> {
+        let project_guard = self.state.get_project();
+        let project = project_guard.as_ref().ok_or(())?;
+
+        let state_file = project.sheet_file();
+        if !state_file.exists() {
+            warn!(
+                "No persisted sheet file found at {:?}, performing an empty save.",
+                state_file
+            );
+            self.persist_sheet_blocking()?;
+            return Err(());
+        }
+        let str = fs::read_to_string(&state_file).map_err(|e| {
+            warn!(
+                "Failed to read persisted sheet from file {:?}: {}",
+                state_file, e
+            );
+        })?;
+        self.state.sheet_from_ron_str(&str).map_err(|e| {
+            warn!(
+                "Failed to restore persisted state from file {:?}: {}",
+                state_file, e
+            );
+        })?;
+
+        Ok(())
     }
 }
 
@@ -191,7 +195,7 @@ impl eframe::App for MainApp {
         }
 
         if self.state.get_project().is_none() {
-            self.draw_placeholder_ui(ctx);
+            self.draw_project_selector_ui(ctx);
         } else {
             if !self.state.sheet_loaded() {
                 self.restore_sheet_blocking();
@@ -200,9 +204,7 @@ impl eframe::App for MainApp {
             self.draw_active_tool_windows(ctx);
         }
 
-        if ctx.input(|i| i.key_pressed(egui::Key::S) && (i.modifiers.ctrl || i.modifiers.command)) {
-            self.persist_sheet_blocking();
-        }
+        self.handle_keyboard_shortcuts(ctx);
 
         if let Some(msg) = self.state.app_get_err_msg().as_ref() {
             ErrorModal::new(msg).draw(ctx);
@@ -223,7 +225,7 @@ impl eframe::App for MainApp {
         for tool in self.tools.iter() {
             eframe::set_value(
                 storage,
-                &AppStore::key(tool.tool_id().to_string()),
+                &AppStore::key(tool.tool_id().to_store_key()),
                 &tool.window_open(),
             );
         }
@@ -245,7 +247,7 @@ impl eframe::App for MainApp {
 }
 
 impl MainApp {
-    fn draw_placeholder_ui(&mut self, ctx: &egui::Context) {
+    fn draw_project_selector_ui(&mut self, ctx: &egui::Context) {
         fn select_working_dir(state: &CentralState) {
             struct ScopeGuard<'state> {
                 state: &'state CentralState,
@@ -346,10 +348,16 @@ impl MainApp {
 
     fn app_menu(&mut self, ui: &mut egui::Ui) {
         MenuButton::from_button(egui::Button::new("󰍜 ").frame_when_inactive(false)).ui(ui, |ui| {
-            if ui.button("保存").clicked() {
-                self.persist_sheet_blocking();
-                ui.close();
-            }
+            ui.menu_button("项目", |ui| {
+                if ui.button("保存").clicked() {
+                    self.persist_sheet_blocking();
+                    ui.close();
+                }
+                if ui.button("关闭").clicked() {
+                    self.state.close_project();
+                    ui.close();
+                }
+            });
         });
     }
 
@@ -525,5 +533,14 @@ impl MainApp {
                 self.state.sheet_del_pattern(&pat_id);
             }
         });
+    }
+}
+
+impl MainApp {
+    fn handle_keyboard_shortcuts(&self, ctx: &egui::Context) {
+        // `ctrl+s`: save sheet
+        if ctx.input(|i| i.key_pressed(egui::Key::S) && (i.modifiers.ctrl || i.modifiers.command)) {
+            self.persist_sheet_blocking();
+        }
     }
 }

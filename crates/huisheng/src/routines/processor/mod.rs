@@ -55,6 +55,11 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
             }
         }
 
+        if !state.dsp_active() {
+            stream_audio_block(&output_tx, [WireDataType::empty_block(); 2]);
+            continue;
+        }
+
         let mut request_repaint = false;
         let mut discard = false;
 
@@ -116,8 +121,12 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
         }
 
         // Send output block to audio stream
-        for (left_sample, right_sample) in output[0].into_iter().zip(output[1]) {
-            output_tx.send([left_sample, right_sample]).unwrap();
-        }
+        stream_audio_block(&output_tx, output);
+    }
+}
+
+fn stream_audio_block(output_tx: &mpsc::SyncSender<[f64; 2]>, output: [[f64; 1024]; 2]) {
+    for (left_sample, right_sample) in output[0].into_iter().zip(output[1]) {
+        output_tx.send([left_sample, right_sample]).unwrap();
     }
 }

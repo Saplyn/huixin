@@ -1,4 +1,5 @@
 use egui_snarl::Snarl;
+use serde::{Deserialize, Serialize};
 
 use crate::model::{DEFAULT_PATCH_NAME, DEFAULT_SELECTABLE_COLOR, patch::node::PatchNode};
 
@@ -6,7 +7,7 @@ pub mod node;
 
 // LYN: Patch
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Patch {
     pub icon: String,
     pub name: String,

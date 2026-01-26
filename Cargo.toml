@@ -8,7 +8,7 @@ edition = "2024"
 authors = ["Saplyn"]
 
 [workspace.dependencies]
-# EGUI
+# EGUI & GUI
 eframe = { version = "0.33", default-features = false }
 egui = { version = "0.33", default-features = false }
 epaint = { version = "0.33", default-features = false }
@@ -16,6 +16,7 @@ ecolor = { version = "0.33", default-features = false }
 emath = { version = "0.33", default-features = false }
 egui_dnd = { version = "0.14", default-features = false }
 egui-winit = { version = "0.33", default-features = false }
+rfd = { version = "0.17", default-features = false }
 # Logging
 chrono = { version = "0.4", default-features = false }
 log = { version = "0.4", default-features = false }
