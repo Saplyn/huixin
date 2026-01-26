@@ -14,7 +14,7 @@ use crate::{
     routines::RoutineId,
 };
 
-const REQUEST_TICK_POLL_INTERVAL: Duration = Duration::from_millis(50);
+const REQUEST_TICK_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 // LYN: Sheet Reader Main Routine
 

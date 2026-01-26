@@ -6,7 +6,7 @@ use crate::model::state::CentralState;
 
 pub const TICK_PER_BEAT: u64 = 4;
 pub const SLEEP_PER_TICK: u32 = 50;
-pub const MAX_SLEEP_TIME: Duration = Duration::from_millis(50);
+pub const MAX_SLEEP_TIME: Duration = Duration::from_millis(10);
 
 // LYN: Metronome Main Routine
 

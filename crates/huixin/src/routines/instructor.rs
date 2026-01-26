@@ -8,7 +8,7 @@ use log::{info, warn};
 
 use crate::model::{comm::SheetMessage, state::CentralState};
 
-const NO_MSG_CHECK_HEALTH_INTERVAL: Duration = Duration::from_millis(50);
+const NO_MSG_CHECK_HEALTH_INTERVAL: Duration = Duration::from_millis(10);
 
 // LYN: Instructor Main Routine
 
