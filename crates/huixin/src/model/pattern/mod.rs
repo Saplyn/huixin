@@ -29,7 +29,7 @@ pub trait SheetPatternTrait {
     fn usable(&self) -> bool;
 
     fn beats(&self) -> u64;
-    fn msg_at(&self, tick: u64) -> Vec<SheetMessage>;
+    fn msg_at(&self, tick: u64, bpm: f64) -> Vec<SheetMessage>;
 }
 
 impl SheetPatternTrait for SheetPattern {
@@ -68,9 +68,9 @@ impl SheetPatternTrait for SheetPattern {
         }
     }
     #[inline]
-    fn msg_at(&self, tick: u64) -> Vec<SheetMessage> {
+    fn msg_at(&self, tick: u64, bpm: f64) -> Vec<SheetMessage> {
         match self {
-            Self::Midi(pat) => pat.msg_at(tick),
+            Self::Midi(pat) => pat.msg_at(tick, bpm),
         }
     }
 }

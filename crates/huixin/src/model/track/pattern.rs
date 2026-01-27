@@ -121,7 +121,7 @@ impl SheetTrackTrait for PatternTrack {
                 if let Some(pattern) = state.sheet_get_pattern(pat_id) {
                     let pattern = pattern.read();
                     let pattern_tick = tick - range.start;
-                    msgs.append(&mut pattern.msg_at(pattern_tick));
+                    msgs.append(&mut pattern.msg_at(pattern_tick, state.sheet_bpm()));
                 }
             }
         }

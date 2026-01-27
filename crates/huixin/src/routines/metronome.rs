@@ -59,6 +59,16 @@ pub fn main(state: Arc<CentralState>) -> ! {
 
 // LYN: Helpers
 
+#[inline]
+pub fn tick_to_secs(tick: u64, bpm: f64) -> f64 {
+    tick as f64 / TICK_PER_BEAT as f64 * (60. / bpm)
+}
+
+#[inline]
+pub fn tick_to_millis(tick: u64, bpm: f64) -> u64 {
+    (tick_to_secs(tick, bpm) * 1000.) as u64
+}
+
 fn bpm_to_tickable(bpm: f64) -> (Duration, Duration) {
     let interval = Duration::from_secs_f64(60. / (bpm * TICK_PER_BEAT as f64));
     (

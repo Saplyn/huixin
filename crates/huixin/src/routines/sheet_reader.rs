@@ -41,7 +41,7 @@ pub fn main(state: Arc<CentralState>, msg_tx: mpsc::Sender<SheetMessage>) -> ! {
                 let Some(pat) = state.selected_pattern() else {
                     continue;
                 };
-                for msg in pat.read().msg_at(tick) {
+                for msg in pat.read().msg_at(tick, state.sheet_bpm()) {
                     msg_tx
                         .send(msg)
                         .expect("Instruction messaging channel unexpectedly closed");

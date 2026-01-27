@@ -12,7 +12,7 @@ use crate::{
         DEFAULT_ICON, DEFAULT_SELECTABLE_COLOR, DEFAULT_TRACK_NAME, comm::SheetMessage,
         state::TargetId,
     },
-    routines::metronome::TICK_PER_BEAT,
+    routines::metronome::{TICK_PER_BEAT, tick_to_millis},
 };
 
 use super::SheetPatternTrait;
@@ -210,7 +210,7 @@ impl SheetPatternTrait for MidiPattern {
     }
 
     #[inline]
-    fn msg_at(&self, tick: u64) -> Vec<SheetMessage> {
+    fn msg_at(&self, tick: u64, bpm: f64) -> Vec<SheetMessage> {
         let Some(target_id) = self.target_id.as_ref() else {
             return Vec::new();
         };
@@ -221,7 +221,7 @@ impl SheetPatternTrait for MidiPattern {
                     target_id: target_id.clone(),
                     payload: Instruction {
                         tag: self.tag.clone(),
-                        data: note.form_data(),
+                        data: note.form_data(bpm),
                         format: None,
                     },
                 })
@@ -299,11 +299,14 @@ impl MidiNote {
         self.start + self.length
     }
     #[inline]
-    pub fn form_data(&self) -> DataMap {
+    pub fn form_data(&self, bpm: f64) -> DataMap {
         let mut map = DataMap::new();
         map.insert("midicode".to_string(), self.midicode.into());
         map.insert("strength".to_string(), self.strength.into());
-        map.insert("length".to_string(), self.length.into()); // FIXME:   
+        map.insert(
+            "length".to_string(),
+            tick_to_millis(self.length, bpm).into(),
+        );
         map
     }
 }
