@@ -74,10 +74,15 @@ impl<'pat> MidiRows<'pat> {
                 painter.line_segment(
                     [line_start, line_end],
                     egui::Stroke::new(
-                        match tick % (TICK_PER_BEAT * 4) {
-                            0 => 0.7,
-                            4 | 8 | 12 => 0.4,
-                            _ => 0.2,
+                        match (
+                            tick % (TICK_PER_BEAT * 4),
+                            tick % TICK_PER_BEAT,
+                            tick % (TICK_PER_BEAT / 4),
+                        ) {
+                            (0, _, _) => 0.8,
+                            (_, 0, _) => 0.4,
+                            (_, _, 0) => 0.2,
+                            _ => 0.0,
                         },
                         visuals.fg_stroke.color.linear_multiply(0.5),
                     ),

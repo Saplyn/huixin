@@ -303,7 +303,7 @@ impl MidiNote {
         let mut map = DataMap::new();
         map.insert("midicode".to_string(), self.midicode.into());
         map.insert("strength".to_string(), self.strength.into());
-        map.insert("length".to_string(), self.length.into());
+        map.insert("length".to_string(), self.length.into()); // FIXME:   
         map
     }
 }
