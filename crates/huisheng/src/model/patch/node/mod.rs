@@ -8,13 +8,14 @@ use crate::model::{
     patch::{
         Bang, Block, Number, WireDataType,
         node::{
-            bang::BangNode, midi_to_freq::MidiToFreq, number::NumberNode, oscillator::Oscillator,
-            remote_data::RemoteData, speaker::Speaker,
+            adsr_curve::ADSRCurve, bang::BangNode, midi_to_freq::MidiToFreq, number::NumberNode,
+            oscillator::Oscillator, remote_data::RemoteData, speaker::Speaker,
         },
     },
     state::CentralState,
 };
 
+pub mod adsr_curve;
 pub mod bang;
 pub mod midi_to_freq;
 pub mod number;
@@ -43,7 +44,7 @@ pub enum PatchNode {
 
     // Calculation
     // Expression(Expression),
-    // ADSRCurve(ADSRCurve),
+    ADSRCurve(Box<ADSRCurve>),
     MidiToFreq(MidiToFreq),
 
     // Processing
@@ -71,7 +72,7 @@ pub enum PatchNodeType {
 
     // Calculation
     // Expression,
-    // ADSRCurve,
+    ADSRCurve,
     MidiToFreq,
 
     // Processing
@@ -147,7 +148,7 @@ impl PatchNode {
 
             // Calculation
             // PatchNode::Expression(_) => PatchNodeType::Expression,
-            // PatchNode::ADSRCurve(_) => PatchNodeType::ADSRCurve,
+            PatchNode::ADSRCurve(_) => PatchNodeType::ADSRCurve,
             PatchNode::MidiToFreq(_) => PatchNodeType::MidiToFreq,
 
             // Processing
@@ -170,6 +171,7 @@ macro_rules! delegate_to_node {
             PatchNode::Speaker(speaker) => speaker.$method($($arg),*),
             PatchNode::Number(num) => num.$method($($arg),*),
             PatchNode::Bang(bang) => bang.$method($($arg),*),
+            PatchNode::ADSRCurve(adsr) => adsr.$method($($arg),*),
             PatchNode::MidiToFreq(mtf) => mtf.$method($($arg),*),
             PatchNode::RemoteData(remote) => remote.$method($($arg),*),
         }

@@ -76,11 +76,10 @@ impl PatchNodeProcessable<'_> for Oscillator {
         if let Some(waveform) = waveform {
             osc.waveform = Waveform::from(waveform);
         }
-        if let Some(reset) = reset
-            && reset
-        {
+        if reset.is_some_and(|val| val) {
             osc.reset();
         }
+
         osc.next_block(sample_rate);
 
         Ok(false)

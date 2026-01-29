@@ -8,12 +8,9 @@ use crate::{
             constants::{input_pin, output_pin},
         },
     },
-    model::patch::{
-        Number,
-        node::{
-            PatchNode,
-            oscillator::{Oscillator, Waveform},
-        },
+    model::patch::node::{
+        PatchNode,
+        oscillator::{Oscillator, Waveform},
     },
 };
 
@@ -44,7 +41,7 @@ impl Oscillator {
         index: usize,
     ) -> PinInfo {
         match index {
-            Self::OUTPUT_BLOCK => output_wave(pin, ui, snarl),
+            Self::OUTPUT_BLOCK => output_block(pin, ui, snarl),
             _ => unreachable!("oscillator only has {} outputs", Self::OUTPUTS),
         }
     }
@@ -158,6 +155,6 @@ fn input_reset(pin: &egui_snarl::InPin, ui: &mut egui::Ui, snarl: &mut Snarl<Nod
 }
 
 #[inline(always)]
-fn output_wave(pin: &egui_snarl::OutPin, ui: &mut egui::Ui, snarl: &Snarl<NodeType>) -> PinInfo {
+fn output_block(pin: &egui_snarl::OutPin, ui: &mut egui::Ui, snarl: &Snarl<NodeType>) -> PinInfo {
     output_pin(This::OUTPUT_TYPE[This::OUTPUT_BLOCK])
 }

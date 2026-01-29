@@ -9,9 +9,9 @@ use crate::{
         patch::{
             Number, WireDataType,
             node::{
-                PatchNodeTrait, PatchNodeType, bang::BangNode, midi_to_freq::MidiToFreq,
-                number::NumberNode, oscillator::Oscillator, remote_data::RemoteData,
-                speaker::Speaker,
+                PatchNodeTrait, PatchNodeType, adsr_curve::ADSRCurve, bang::BangNode,
+                midi_to_freq::MidiToFreq, number::NumberNode, oscillator::Oscillator,
+                remote_data::RemoteData, speaker::Speaker,
             },
         },
         state::{CentralState, PatchId},
@@ -64,7 +64,10 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
         let mut topo = Topo::new(&graph);
         while let Some(node_index) = topo.next(&graph) {
             let (ref patch_id, node_id) = graph[node_index];
-            let patch_arc = state.sheet_get_patch(patch_id).unwrap();
+            let Some(patch_arc) = state.sheet_get_patch(patch_id) else {
+                discard = true;
+                break;
+            };
             let mut patch_guard = patch_arc.write();
 
             let Some(node) = patch_guard.snarl.get_node_mut(node_id) else {
@@ -86,6 +89,9 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
                 PatchNodeType::Bang => BangNode::process(node_id, &mut patch_guard.snarl, ()),
 
                 // Calculation
+                PatchNodeType::ADSRCurve => {
+                    ADSRCurve::process(node_id, &mut patch_guard.snarl, sample_rate)
+                }
                 PatchNodeType::MidiToFreq => {
                     MidiToFreq::process(node_id, &mut patch_guard.snarl, ())
                 }

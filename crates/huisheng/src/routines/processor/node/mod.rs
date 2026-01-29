@@ -2,6 +2,7 @@ use egui_snarl::{NodeId, Snarl};
 
 use crate::model::patch::node::PatchNode;
 
+pub mod adsr_curve;
 pub mod bang;
 pub mod midi_to_freq;
 pub mod number;

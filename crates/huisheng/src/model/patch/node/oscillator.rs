@@ -157,7 +157,7 @@ impl Oscillator {
         }
 
         let mut block = [0.; BLOCK_SIZE];
-        block.iter_mut().enumerate().for_each(|(index, frame)| {
+        for (index, frame) in block.iter_mut().enumerate() {
             match state {
                 Either::Left(state) => {
                     *frame = match self.waveform {
@@ -180,7 +180,7 @@ impl Oscillator {
                 }
             };
             self.memory[index] = *frame;
-        });
+        }
 
         block
     }
