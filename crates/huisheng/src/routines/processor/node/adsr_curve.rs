@@ -80,8 +80,7 @@ impl PatchNodeProcessable<'_> for ADSRCurve {
             adsr.trigger();
         }
 
-        let blk = adsr.next_block(sample_rate);
-        log::error!("{:?}", blk.get(1));
+        adsr.next_block(sample_rate);
 
         Ok(false)
     }
