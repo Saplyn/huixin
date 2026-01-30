@@ -10,9 +10,9 @@ use crate::model::{
     patch::{
         WireDataType,
         node::{
-            PatchNode, PatchNodeTrait, PatchNodeType, adsr_curve::ADSRCurve, bang::BangNode,
-            midi_to_freq::MidiToFreq, number::NumberNode, oscillator::Oscillator,
-            remote_data::RemoteData, speaker::Speaker,
+            PatchNode, PatchNodeTrait, PatchNodeType, adsr_curve::ADSRCurve,
+            amp_multiplier::AmpMultiplier, bang::BangNode, midi_to_freq::MidiToFreq,
+            number::NumberNode, oscillator::Oscillator, remote_data::RemoteData, speaker::Speaker,
         },
     },
     state::CentralState,
@@ -170,6 +170,9 @@ impl SnarlViewer<NodeType> for PatchViewer {
             PatchNodeType::ADSRCurve => ADSRCurve::pin_input(pin, ui, snarl, pin.id.input),
             PatchNodeType::MidiToFreq => MidiToFreq::pin_input(pin, ui, snarl, pin.id.input),
 
+            // Processing
+            PatchNodeType::AmpMultiplier => AmpMultiplier::pin_input(pin, ui, snarl, pin.id.input),
+
             // Communication
             PatchNodeType::RemoteData => RemoteData::pin_input(pin, ui, snarl, pin.id.input),
         }
@@ -195,6 +198,11 @@ impl SnarlViewer<NodeType> for PatchViewer {
             // Calculation
             PatchNodeType::ADSRCurve => ADSRCurve::pin_output(pin, ui, snarl, pin.id.output),
             PatchNodeType::MidiToFreq => MidiToFreq::pin_output(pin, ui, snarl, pin.id.output),
+
+            // Processing
+            PatchNodeType::AmpMultiplier => {
+                AmpMultiplier::pin_output(pin, ui, snarl, pin.id.output)
+            }
 
             // Communication
             PatchNodeType::RemoteData => RemoteData::pin_output(pin, ui, snarl, pin.id.output),
@@ -247,7 +255,12 @@ impl SnarlViewer<NodeType> for PatchViewer {
             if ui.button("加波器").clicked() {
                 ui.close();
             }
-            if ui.button("乘波器").clicked() {
+            if ui.button(AmpMultiplier::NAME).clicked() {
+                self.insert_node(
+                    snarl,
+                    pos,
+                    PatchNode::AmpMultiplier(AmpMultiplier::new().into()),
+                );
                 ui.close();
             }
             if ui.button("移幅器").clicked() {

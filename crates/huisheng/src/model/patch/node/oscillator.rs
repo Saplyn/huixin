@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::model::{
     data_mem::NonBlockData,
-    patch::{BLOCK_SIZE, Block, Number, WireDataType, node::PatchNodeTrait},
+    patch::{Block, Number, WireDataType, node::PatchNodeTrait},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -81,7 +81,7 @@ impl PatchNodeTrait for Oscillator {
         assert_eq!(pin_index, Self::OUTPUT_BLOCK);
         Some(&self.memory)
     }
-    fn output_arbitrary(&mut self, _pin_index: usize, _node_id: NodeId) -> Option<NonBlockData> {
+    fn output_nonblock(&mut self, _pin_index: usize, _node_id: NodeId) -> Option<NonBlockData> {
         None
     }
 }
@@ -129,7 +129,7 @@ impl Oscillator {
             input_ids: [None; Self::INPUTS],
 
             state: None,
-            memory: [0.; BLOCK_SIZE],
+            memory: WireDataType::empty_block(),
         }
     }
     pub fn reset(&mut self) {
@@ -156,7 +156,7 @@ impl Oscillator {
             *state = Either::Left(self.phase % 1.);
         }
 
-        let mut block = [0.; BLOCK_SIZE];
+        let mut block = WireDataType::empty_block();
         for (index, frame) in block.iter_mut().enumerate() {
             match state {
                 Either::Left(state) => {

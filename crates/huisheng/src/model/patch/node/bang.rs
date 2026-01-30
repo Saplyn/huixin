@@ -92,7 +92,7 @@ impl PatchNodeTrait for BangNode {
 
         Some(bang)
     }
-    fn output_arbitrary(&mut self, pin_index: usize, node_id: NodeId) -> Option<NonBlockData> {
+    fn output_nonblock(&mut self, pin_index: usize, node_id: NodeId) -> Option<NonBlockData> {
         assert_eq!(pin_index, Self::OUTPUT_BANG);
         self.output_bang(pin_index, node_id).map(NonBlockData::Bang)
     }

@@ -86,7 +86,7 @@ impl PatchNodeTrait for ADSRCurve {
         assert_eq!(pin_index, Self::OUTPUT_BLOCK);
         Some(&self.memory)
     }
-    fn output_arbitrary(&mut self, _pin_index: usize, _node_id: NodeId) -> Option<NonBlockData> {
+    fn output_nonblock(&mut self, _pin_index: usize, _node_id: NodeId) -> Option<NonBlockData> {
         None
     }
 }

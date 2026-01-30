@@ -24,7 +24,7 @@ impl RemoteData {
         match index {
             Self::INPUT_TAG => input_tag(pin, ui, snarl),
             Self::INPUT_PROP => input_prop(pin, ui, snarl),
-            _ => unreachable!("bang node only has {} inputs", Self::INPUTS),
+            _ => unreachable!("remote data only has {} inputs", Self::INPUTS),
         }
     }
 
@@ -38,7 +38,7 @@ impl RemoteData {
         match index {
             Self::OUTPUT_DATA => output_data(pin, ui, snarl),
             Self::OUTPUT_BANG => output_bang(pin, ui, snarl),
-            _ => unreachable!("bang node only has {} outputs", Self::OUTPUTS),
+            _ => unreachable!("remote data only has {} outputs", Self::OUTPUTS),
         }
     }
 }

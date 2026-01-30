@@ -68,7 +68,7 @@ impl PatchNodeTrait for MidiToFreq {
         assert_eq!(pin_index, Self::OUTPUT_FREQ);
         Some(self.freq())
     }
-    fn output_arbitrary(&mut self, pin_index: usize, _node_id: NodeId) -> Option<NonBlockData> {
+    fn output_nonblock(&mut self, pin_index: usize, _node_id: NodeId) -> Option<NonBlockData> {
         assert_eq!(pin_index, Self::OUTPUT_FREQ);
         self.output_number(pin_index).map(NonBlockData::Number)
     }

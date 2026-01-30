@@ -5,28 +5,32 @@ use serde::{Deserialize, Serialize};
 
 use crate::model::{
     data_mem::NonBlockData,
-    patch::{WireDataType, node::PatchNodeTrait},
+    patch::{Block, WireDataType, node::PatchNodeTrait},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Speaker {
+pub struct AmpMultiplier {
     input_ids: [HashSet<OutPinId>; Self::INPUTS],
+
+    #[serde(skip, default = "WireDataType::empty_block")]
+    memory: Block,
 }
 
-impl Speaker {
-    pub const NAME: &str = "扬声器";
+impl AmpMultiplier {
+    pub const NAME: &str = "乘幅器";
     pub const INPUTS: usize = 2;
-    pub const OUTPUTS: usize = 0;
+    pub const OUTPUTS: usize = 1;
 
-    pub const INPUT_LEFT_CHAN: usize = 0;
-    pub const INPUT_RIGHT_CHAN: usize = 1;
+    pub const INPUT_LEFT_OPS: usize = 0;
+    pub const INPUT_RIGHT_OPS: usize = 1;
     pub const INPUT_TYPE: [WireDataType; Self::INPUTS] = [WireDataType::Block, WireDataType::Block];
     pub const INPUT_ACCEPT_MULTI: [bool; Self::INPUTS] = [true, true];
 
-    pub const OUTPUT_TYPE: [WireDataType; Self::OUTPUTS] = [];
+    pub const OUTPUT_RESULT: usize = 0;
+    pub const OUTPUT_TYPE: [WireDataType; Self::OUTPUTS] = [WireDataType::Block];
 }
 
-impl PatchNodeTrait for Speaker {
+impl PatchNodeTrait for AmpMultiplier {
     fn name(&self) -> &str {
         Self::NAME
     }
@@ -54,15 +58,24 @@ impl PatchNodeTrait for Speaker {
     fn drop_input(&mut self, pin_index: usize, source: OutPinId) {
         self.input_ids[pin_index].remove(&source);
     }
+    fn output_block(&self, pin_index: usize) -> Option<&Block> {
+        assert_eq!(pin_index, Self::OUTPUT_RESULT);
+        Some(&self.memory)
+    }
     fn output_nonblock(&mut self, _pin_index: usize, _node_id: NodeId) -> Option<NonBlockData> {
-        unreachable!("Speaker has {} output pins", Self::OUTPUTS);
+        None
     }
 }
 
-impl Speaker {
+impl AmpMultiplier {
     pub fn new() -> Self {
         Self {
             input_ids: [HashSet::new(), HashSet::new()],
+            memory: WireDataType::empty_block(),
         }
+    }
+
+    pub fn memory_mut(&mut self) -> &mut Block {
+        &mut self.memory
     }
 }

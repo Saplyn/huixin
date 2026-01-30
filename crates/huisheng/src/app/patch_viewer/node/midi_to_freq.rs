@@ -20,7 +20,7 @@ impl MidiToFreq {
     ) -> PinInfo {
         match index {
             Self::INPUT_MIDI => input_midi(pin, ui, snarl),
-            _ => unreachable!("number node only has {} inputs", Self::INPUTS),
+            _ => unreachable!("midi to freq only has {} inputs", Self::INPUTS),
         }
     }
 
@@ -33,7 +33,7 @@ impl MidiToFreq {
     ) -> PinInfo {
         match index {
             Self::OUTPUT_FREQ => output_freq(pin, ui, snarl),
-            _ => unreachable!("number node only has {} outputs", Self::OUTPUTS),
+            _ => unreachable!("midi to freq only has {} outputs", Self::OUTPUTS),
         }
     }
 }

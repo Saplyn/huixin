@@ -8,14 +8,16 @@ use crate::model::{
     patch::{
         Bang, Block, Number, WireDataType,
         node::{
-            adsr_curve::ADSRCurve, bang::BangNode, midi_to_freq::MidiToFreq, number::NumberNode,
-            oscillator::Oscillator, remote_data::RemoteData, speaker::Speaker,
+            adsr_curve::ADSRCurve, amp_multiplier::AmpMultiplier, bang::BangNode,
+            midi_to_freq::MidiToFreq, number::NumberNode, oscillator::Oscillator,
+            remote_data::RemoteData, speaker::Speaker,
         },
     },
     state::CentralState,
 };
 
 pub mod adsr_curve;
+pub mod amp_multiplier;
 pub mod bang;
 pub mod midi_to_freq;
 pub mod number;
@@ -46,10 +48,12 @@ pub enum PatchNode {
     // Expression(Expression),
     ADSRCurve(Box<ADSRCurve>),
     MidiToFreq(MidiToFreq),
+    // SignalToNumber(SignalToNumber),
 
     // Processing
+    // NumberToSignal(NumberToSignal),
+    AmpMultiplier(Box<AmpMultiplier>),
     // WaveAdder(WaveAdder),
-    // WaveMultiplier(WaveMultiplier),
     // WaveOffseter(WaveOffseter),
     // WaveScaler(WaveScaler),
     // WaveClipper(WaveClipper),
@@ -77,7 +81,7 @@ pub enum PatchNodeType {
 
     // Processing
     // WaveAdder,
-    // WaveMultiplier,
+    AmpMultiplier,
     // WaveOffseter,
     // WaveScaler,
     // WaveClipper,
@@ -119,7 +123,7 @@ pub trait PatchNodeTrait {
         let _ = (pin_index, node_id);
         None
     }
-    fn output_arbitrary(&mut self, pin_index: usize, node_id: NodeId) -> Option<NonBlockData>;
+    fn output_nonblock(&mut self, pin_index: usize, node_id: NodeId) -> Option<NonBlockData>;
     fn pre_process(&mut self, state: Arc<CentralState>) {
         let _ = state;
     }
@@ -153,7 +157,7 @@ impl PatchNode {
 
             // Processing
             // PatchNode::WaveAdder(_) => PatchNodeType::WaveAdder,
-            // PatchNode::WaveMultiplier(_) => PatchNodeType::WaveMultiplier,
+            PatchNode::AmpMultiplier(_) => PatchNodeType::AmpMultiplier,
             // PatchNode::WaveOffseter(_) => PatchNodeType::WaveOffseter,
             // PatchNode::WaveScaler(_) => PatchNodeType::WaveScaler,
             // PatchNode::WaveClipper(_) => PatchNodeType::WaveClipper,
@@ -174,6 +178,7 @@ macro_rules! delegate_to_node {
             PatchNode::ADSRCurve(adsr) => adsr.$method($($arg),*),
             PatchNode::MidiToFreq(mtf) => mtf.$method($($arg),*),
             PatchNode::RemoteData(remote) => remote.$method($($arg),*),
+            PatchNode::AmpMultiplier(amp_mul) => amp_mul.$method($($arg),*),
         }
     };
 }
@@ -252,8 +257,8 @@ impl PatchNodeTrait for PatchNode {
     }
 
     #[inline]
-    fn output_arbitrary(&mut self, pin_index: usize, node_id: NodeId) -> Option<NonBlockData> {
-        delegate_to_node!(self, output_arbitrary, pin_index, node_id)
+    fn output_nonblock(&mut self, pin_index: usize, node_id: NodeId) -> Option<NonBlockData> {
+        delegate_to_node!(self, output_nonblock, pin_index, node_id)
     }
 
     #[inline]

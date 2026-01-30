@@ -121,7 +121,7 @@ impl PatchNodeTrait for RemoteData {
         };
         Some(bang)
     }
-    fn output_arbitrary(&mut self, pin_index: usize, node_id: NodeId) -> Option<NonBlockData> {
+    fn output_nonblock(&mut self, pin_index: usize, node_id: NodeId) -> Option<NonBlockData> {
         if pin_index == Self::OUTPUT_BANG {
             return self.output_bang(pin_index, node_id).map(NonBlockData::Bang);
         }

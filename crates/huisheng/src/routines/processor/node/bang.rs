@@ -19,7 +19,7 @@ impl PatchNodeProcessable<'_> for BangNode {
 
         let mut val = None;
         if let Some(src) = bang.input_for_pin(BangNode::INPUT_ARBITRARY).to_owned() {
-            val = node_or_bail!(mut snarl, src.node).output_arbitrary(src.output, node_id);
+            val = node_or_bail!(mut snarl, src.node).output_nonblock(src.output, node_id);
         }
 
         let PatchNode::Bang(bang) = node_or_bail!(mut snarl, node_id) else {

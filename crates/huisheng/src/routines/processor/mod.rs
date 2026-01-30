@@ -9,9 +9,10 @@ use crate::{
         patch::{
             Number, WireDataType,
             node::{
-                PatchNodeTrait, PatchNodeType, adsr_curve::ADSRCurve, bang::BangNode,
-                midi_to_freq::MidiToFreq, number::NumberNode, oscillator::Oscillator,
-                remote_data::RemoteData, speaker::Speaker,
+                PatchNodeTrait, PatchNodeType, adsr_curve::ADSRCurve,
+                amp_multiplier::AmpMultiplier, bang::BangNode, midi_to_freq::MidiToFreq,
+                number::NumberNode, oscillator::Oscillator, remote_data::RemoteData,
+                speaker::Speaker,
             },
         },
         state::{CentralState, PatchId},
@@ -94,6 +95,11 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
                 }
                 PatchNodeType::MidiToFreq => {
                     MidiToFreq::process(node_id, &mut patch_guard.snarl, ())
+                }
+
+                // Processing
+                PatchNodeType::AmpMultiplier => {
+                    AmpMultiplier::process(node_id, &mut patch_guard.snarl, ())
                 }
 
                 // Communication

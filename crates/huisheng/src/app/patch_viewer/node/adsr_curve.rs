@@ -26,7 +26,7 @@ impl ADSRCurve {
             Self::INPUT_PEAK => input_peak(pin, ui, snarl),
             Self::INPUT_KEEP => input_keep(pin, ui, snarl),
             Self::INPUT_TRIGGER => input_trigger(pin, ui, snarl),
-            _ => unreachable!("oscillator only has {} inputs", Self::INPUTS),
+            _ => unreachable!("adsr curve only has {} inputs", Self::INPUTS),
         }
     }
 
@@ -39,7 +39,7 @@ impl ADSRCurve {
     ) -> PinInfo {
         match index {
             Self::OUTPUT_BLOCK => output_block(pin, ui, snarl),
-            _ => unreachable!("oscillator only has {} outputs", Self::OUTPUTS),
+            _ => unreachable!("adsr curve only has {} outputs", Self::OUTPUTS),
         }
     }
 }
