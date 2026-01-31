@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use egui::containers::menu::MenuButton;
+use egui::{TextBuffer, containers::menu::MenuButton};
 use egui_dnd::dnd;
 use egui_snarl::ui::{PinPlacement, SnarlStyle, SnarlWidget};
 use log::warn;
@@ -34,6 +34,9 @@ mod widgets;
 
 #[derive(Debug)]
 pub struct MainApp {
+    // local state
+    new_patch_name: String,
+
     // widget states
     performance: Performance,
 
@@ -69,6 +72,7 @@ impl MainApp {
         });
 
         Self {
+            new_patch_name: String::new(),
             performance: Default::default(),
             processor_cmd_tx,
             state,
@@ -156,7 +160,6 @@ impl MainApp {
                             Ok(patch_str) => {
                                 match ron::from_str::<Arc<RwLock<Patch>>>(&patch_str) {
                                     Ok(patch) => {
-                                        patch.write().name = name.clone();
                                         patches.insert(name, patch);
                                     }
                                     Err(e) => {
@@ -199,40 +202,21 @@ impl MainApp {
         })?;
 
         // Fix ordering
-        let name_to_id = persisted.name_id_mapping.clone();
-        persisted.ordering.retain(|patch_id| {
-            name_to_id
-                .iter()
-                .find(|(_, id)| *id == patch_id)
-                .and_then(|(name, _)| patches.get(name))
-                .is_some()
-        });
+        persisted
+            .ordering
+            .retain(|patch_name| patches.contains_key(patch_name));
 
         // Add patch IDs for patches that exist but aren't in ordering
         let mut patches_in_ordering: std::collections::HashSet<_> =
             persisted.ordering.iter().cloned().collect();
 
-        for (name, patch_id) in persisted.name_id_mapping.iter() {
-            if patches.contains_key(name) && !patches_in_ordering.contains(patch_id) {
-                persisted.ordering.push(patch_id.clone());
-                patches_in_ordering.insert(patch_id.clone());
+        for name in patches.keys() {
+            if !patches_in_ordering.contains(name) {
+                persisted.ordering.push(name.clone());
+                patches_in_ordering.insert(name.clone());
             }
         }
 
-        // Remove mappings for non-existent patches
-        persisted
-            .name_id_mapping
-            .retain(|name, _| patches.contains_key(name));
-
-        // Add mappings for patches without IDs
-        for patch_name in patches.keys() {
-            if !persisted.name_id_mapping.contains_key(patch_name) {
-                let new_id = lyn_util::egui::LynId::obtain_string().into();
-                persisted.name_id_mapping.insert(patch_name.clone(), new_id);
-            }
-        }
-
-        // Step 4: Apply the loaded state
         self.state.sheet_from_persisted(persisted, patches);
 
         Ok(())
@@ -387,7 +371,7 @@ impl MainApp {
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(ctx.style().visuals.extreme_bg_color))
             .show(ctx, |ui| {
-                let Some(WithId { item: patch, .. }) = self.state.selected_patch() else {
+                let Some((_, patch)) = self.state.selected_patch() else {
                     if ui.response().hovered() {
                         ui.ctx().set_cursor_icon(egui::CursorIcon::NotAllowed);
                     }
@@ -425,19 +409,28 @@ impl MainApp {
     }
 
     fn explorer(&mut self, ui: &mut egui::Ui) {
-        if ui
-            .add_sized([ui.available_width(), 30.], egui::Button::new("添加音图"))
-            .clicked()
-        {
-            self.state.sheet_add_patch();
-        };
+        ui.add_sized(
+            [ui.available_width(), 0.],
+            egui::TextEdit::singleline(&mut self.new_patch_name),
+        );
+
+        let disable_add_button =
+            self.new_patch_name.is_empty() || self.state.sheet_patch_has_name(&self.new_patch_name);
+        ui.add_enabled_ui(!disable_add_button, |ui| {
+            if ui
+                .add_sized([ui.available_width(), 30.], egui::Button::new("添加音图"))
+                .clicked()
+            {
+                self.state.sheet_add_patch(self.new_patch_name.take());
+            };
+        });
 
         egui::ScrollArea::vertical().show(ui, |ui| {
             let mut to_be_removed = Vec::new();
             dnd(ui, WidgetId::MainAppExplorerPatchesOrderingDnd).show_vec(
                 &mut self.state.sheet_patches_ordering_mut(),
-                |ui, patch_id, handle, _state| {
-                    let Some(arc) = self.state.sheet_get_patch(patch_id) else {
+                |ui, patch_name, handle, _state| {
+                    let Some(arc) = self.state.sheet_get_patch(patch_name) else {
                         return;
                     };
                     let guard = arc.read();
@@ -459,30 +452,30 @@ impl MainApp {
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
                             if ui.button(egui::RichText::new(" ").heading()).clicked() {
-                                to_be_removed.push(patch_id.clone());
+                                to_be_removed.push(patch_name.clone());
                             }
 
                             let pat_button = ui.add_sized(
                                 ui.available_size(),
-                                egui::Button::new(&guard.name)
+                                egui::Button::new(&*patch_name)
                                     .right_text("")
                                     .selected(
                                         self.state
-                                            .selected_patch_id()
+                                            .selected_patch_name()
                                             .as_ref()
-                                            .is_some_and(|id| id == patch_id),
+                                            .is_some_and(|name| name == patch_name),
                                     )
                                     .frame_when_inactive(true),
                             );
                             if pat_button.clicked() {
-                                self.state.select_patch(Some(patch_id.clone()));
+                                self.state.select_patch(Some(patch_name.clone()));
                             };
                         });
                     });
                 },
             );
-            for pat_id in to_be_removed {
-                self.state.sheet_del_patch(&pat_id);
+            for pat_name in to_be_removed {
+                self.state.sheet_del_patch(&pat_name);
             }
         });
     }

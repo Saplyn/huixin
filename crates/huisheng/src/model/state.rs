@@ -21,14 +21,6 @@ use ws::WebSocket;
 
 use crate::model::{data_mem::MemData, patch::Patch};
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PatchId(String);
-impl From<String> for PatchId {
-    fn from(value: String) -> Self {
-        Self(value)
-    }
-}
-
 const DEFAULT_LISTENER_PORT: u16 = 3000;
 
 #[derive(Debug)]
@@ -53,7 +45,7 @@ pub struct App {
     states_loaded: RwLock<bool>,
     dsp_active: RwLock<bool>,
     err_modal_message: RwLock<Option<String>>,
-    selected_patch: RwLock<Option<PatchId>>,
+    selected_patch_name: RwLock<Option<String>>,
 }
 
 #[derive(Debug)]
@@ -67,15 +59,14 @@ pub struct ListenerState {
 pub struct Sheet {
     port: RwLock<(u16 /* port */, bool /* public */)>,
 
-    patches: DashMap<PatchId, Arc<RwLock<Patch>>>,
-    patches_ordering: RwLock<Vec<PatchId>>,
+    patches: DashMap<String /* name */, Arc<RwLock<Patch>>>,
+    patches_ordering: RwLock<Vec<String /* name */>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PersistedState {
     pub port: (u16 /* port */, bool /* public */),
-    pub name_id_mapping: HashMap<String /* name */, PatchId>,
-    pub ordering: Vec<PatchId>,
+    pub ordering: Vec<String /* name */>,
 }
 
 pub struct CpalState {
@@ -130,7 +121,7 @@ impl CentralState {
             states_loaded: RwLock::new(false),
             dsp_active: RwLock::new(false),
             err_modal_message: RwLock::new(None),
-            selected_patch: RwLock::new(None),
+            selected_patch_name: RwLock::new(None),
         };
 
         Self {
@@ -164,16 +155,16 @@ impl CentralState {
         self.workers.spawn(f);
     }
 
-    pub fn selected_patch_id(&self) -> RwLockReadGuard<'_, Option<PatchId>> {
-        self.app.selected_patch.read()
+    pub fn selected_patch_name(&self) -> RwLockReadGuard<'_, Option<String>> {
+        self.app.selected_patch_name.read()
     }
-    pub fn selected_patch(&self) -> Option<WithId<PatchId, Arc<RwLock<Patch>>>> {
-        let selected_id = self.app.selected_patch.read().clone()?;
-        let patch = self.sheet.patches.get(&selected_id)?.clone();
-        Some(WithId::new(selected_id, patch))
+    pub fn selected_patch(&self) -> Option<(String, Arc<RwLock<Patch>>)> {
+        let selected_name = self.app.selected_patch_name.read().clone()?;
+        let patch = self.sheet.patches.get(&selected_name)?.clone();
+        Some((selected_name, patch))
     }
-    pub fn select_patch(&self, id: Option<PatchId>) {
-        *self.app.selected_patch.write() = id;
+    pub fn select_patch(&self, name: Option<String>) {
+        *self.app.selected_patch_name.write() = name;
     }
 
     pub fn dsp_active(&self) -> bool {
@@ -256,24 +247,29 @@ impl CentralState {
 }
 
 impl CentralState {
-    pub fn sheet_add_patch(&self) -> WithId<PatchId, Arc<RwLock<Patch>>> {
-        let id: PatchId = LynId::obtain_string().into();
+    pub fn sheet_patch_has_name(&self, name: &String) -> bool {
+        self.sheet.patches.contains_key(name)
+    }
+    pub fn sheet_add_patch(&self, name: String) -> Arc<RwLock<Patch>> {
         let patch = Arc::new(RwLock::new(Patch::new()));
-        self.sheet.patches.insert(id.clone(), patch.clone());
-        self.sheet.patches_ordering.write().push(id.clone());
-        WithId::new(id, patch)
+        self.sheet.patches.insert(name.clone(), patch.clone());
+        self.sheet.patches_ordering.write().push(name);
+        patch
     }
-    pub fn sheet_get_patch(&self, id: &PatchId) -> Option<Arc<RwLock<Patch>>> {
-        self.sheet.patches.get(id).map(|entry| entry.clone())
+    pub fn sheet_get_patch(&self, name: &String) -> Option<Arc<RwLock<Patch>>> {
+        self.sheet.patches.get(name).map(|entry| entry.clone())
     }
-    pub fn sheet_del_patch(&self, id: &PatchId) {
-        self.sheet.patches_ordering.write().retain(|pid| pid != id);
-        self.sheet.patches.remove(id);
+    pub fn sheet_del_patch(&self, name: &String) {
+        self.sheet
+            .patches_ordering
+            .write()
+            .retain(|pid| pid != name);
+        self.sheet.patches.remove(name);
     }
-    pub fn sheet_patches_iter(&self) -> Iter<'_, PatchId, Arc<RwLock<Patch>>> {
+    pub fn sheet_patches_iter(&self) -> Iter<'_, String, Arc<RwLock<Patch>>> {
         self.sheet.patches.iter()
     }
-    pub fn sheet_patches_ordering_mut(&self) -> RwLockWriteGuard<'_, Vec<PatchId>> {
+    pub fn sheet_patches_ordering_mut(&self) -> RwLockWriteGuard<'_, Vec<String>> {
         self.sheet.patches_ordering.write()
     }
 
@@ -289,32 +285,14 @@ impl CentralState {
     }
     pub fn sheet_to_persisted(&self) -> (HashMap<String, Arc<RwLock<Patch>>>, PersistedState) {
         let mut patches = HashMap::new();
-        let mut name_id_mapping = HashMap::new();
         for entry in self.sheet.patches.iter() {
-            let id = entry.key().clone();
-            let name = entry
-                .value()
-                .read()
-                .name
-                .clone()
-                .replace('/', "_")
-                .replace('\\', "_");
-
-            let (mut store_name, mut suffix) = (name.clone(), 0);
-            while patches.contains_key(&store_name) {
-                store_name = format!("{} {}", name, suffix + 1);
-                suffix += 1;
-            }
-
-            patches.insert(store_name.clone(), entry.value().clone());
-            name_id_mapping.insert(store_name, id);
+            patches.insert(entry.key().clone(), entry.value().clone());
         }
 
         (
             patches,
             PersistedState {
                 port: *self.sheet.port.read(),
-                name_id_mapping,
                 ordering: self.sheet.patches_ordering.read().clone(),
             },
         )
@@ -322,15 +300,13 @@ impl CentralState {
     pub fn sheet_from_persisted(
         &self,
         persisted: PersistedState,
-        mut patches: HashMap<String, Arc<RwLock<Patch>>>,
+        patches: HashMap<String, Arc<RwLock<Patch>>>,
     ) {
         *self.sheet.port.write() = persisted.port;
 
         self.sheet.patches.clear();
-        for (name, id) in persisted.name_id_mapping {
-            if let Some(patch) = patches.remove(&name) {
-                self.sheet.patches.insert(id, patch);
-            }
+        for (name, patch) in patches {
+            self.sheet.patches.insert(name, patch);
         }
 
         *self.sheet.patches_ordering.write() = persisted.ordering.clone();

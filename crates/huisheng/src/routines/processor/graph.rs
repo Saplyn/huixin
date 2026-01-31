@@ -4,10 +4,7 @@ use egui_snarl::{InPinId, NodeId, OutPinId};
 use petgraph::graph::{DiGraph, NodeIndex};
 
 use crate::{
-    model::{
-        patch::Patch,
-        state::{CentralState, PatchId},
-    },
+    model::{patch::Patch, state::CentralState},
     routines::processor::{DiGraphEdge, DiGraphNode},
 };
 
@@ -18,7 +15,7 @@ pub fn rebuild_graph(state: &CentralState, graph: &mut DiGraph<DiGraphNode, DiGr
 }
 
 fn build_graph(state: &CentralState, graph: &mut DiGraph<DiGraphNode, DiGraphEdge>) {
-    let mut node_id_to_index: HashMap<(PatchId, NodeId), NodeIndex> = HashMap::new();
+    let mut node_id_to_index: HashMap<(String, NodeId), NodeIndex> = HashMap::new();
 
     for entry in state.sheet_patches_iter() {
         let patch_id = entry.key().clone();

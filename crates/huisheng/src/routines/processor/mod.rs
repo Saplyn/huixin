@@ -15,7 +15,7 @@ use crate::{
                 speaker::Speaker,
             },
         },
-        state::{CentralState, PatchId},
+        state::CentralState,
     },
     routines::processor::{graph::rebuild_graph, node::PatchNodeProcessable, stream::build_stream},
 };
@@ -28,7 +28,7 @@ pub enum Command {
     RebuildGraph,
 }
 
-type DiGraphNode = (PatchId, NodeId);
+type DiGraphNode = (String /* name (or alias) */, NodeId);
 type DiGraphEdge = (usize /* from pin */, usize /* to pin */);
 
 const BUFFER_SIZE: usize = 64;
