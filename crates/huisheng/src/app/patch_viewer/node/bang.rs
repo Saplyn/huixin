@@ -62,9 +62,9 @@ fn input_arbitrary(
 }
 
 fn output_bang(
-    pin: &egui_snarl::OutPin,
-    ui: &mut egui::Ui,
-    snarl: &mut Snarl<PatchNode>,
+    _pin: &egui_snarl::OutPin,
+    _ui: &mut egui::Ui,
+    _snarl: &mut Snarl<PatchNode>,
 ) -> PinInfo {
     output_pin(This::OUTPUT_TYPE[This::OUTPUT_BANG])
 }

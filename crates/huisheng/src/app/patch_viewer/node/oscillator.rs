@@ -155,6 +155,10 @@ fn input_reset(pin: &egui_snarl::InPin, ui: &mut egui::Ui, snarl: &mut Snarl<Nod
 }
 
 #[inline(always)]
-fn output_block(pin: &egui_snarl::OutPin, ui: &mut egui::Ui, snarl: &Snarl<NodeType>) -> PinInfo {
+fn output_block(
+    _pin: &egui_snarl::OutPin,
+    _ui: &mut egui::Ui,
+    _snarl: &Snarl<NodeType>,
+) -> PinInfo {
     output_pin(This::OUTPUT_TYPE[This::OUTPUT_BLOCK])
 }

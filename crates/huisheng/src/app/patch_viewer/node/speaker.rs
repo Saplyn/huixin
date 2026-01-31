@@ -37,9 +37,9 @@ impl Speaker {
 
 #[inline(always)]
 fn input_left_chan(
-    pin: &egui_snarl::InPin,
+    _pin: &egui_snarl::InPin,
     ui: &mut egui::Ui,
-    snarl: &mut Snarl<NodeType>,
+    _snarl: &mut Snarl<NodeType>,
 ) -> PinInfo {
     ui.label("左声道");
 
@@ -51,9 +51,9 @@ fn input_left_chan(
 
 #[inline(always)]
 fn input_right_chan(
-    pin: &egui_snarl::InPin,
+    _pin: &egui_snarl::InPin,
     ui: &mut egui::Ui,
-    snarl: &mut Snarl<NodeType>,
+    _snarl: &mut Snarl<NodeType>,
 ) -> PinInfo {
     ui.label("右声道");
 

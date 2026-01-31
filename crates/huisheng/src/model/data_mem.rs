@@ -35,23 +35,3 @@ pub enum NonBlockData {
     Text(Text),
     Bang(Bang),
 }
-
-impl MemData {
-    pub fn get_number(&self) -> Option<f64> {
-        if let NonBlockData::Number(n) = self.inner {
-            Some(n)
-        } else {
-            None
-        }
-    }
-    pub fn get_text(&self) -> Option<&str> {
-        if let NonBlockData::Text(ref s) = self.inner {
-            Some(s)
-        } else {
-            None
-        }
-    }
-    pub fn get_marker(&self) -> u8 {
-        self.marker
-    }
-}

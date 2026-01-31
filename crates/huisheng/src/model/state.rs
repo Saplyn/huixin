@@ -11,9 +11,8 @@ use cpal::traits::{DeviceTrait, HostTrait};
 use dashmap::{
     DashMap,
     iter::{Iter, IterMut},
-    mapref::one::{Ref, RefMut},
 };
-use lyn_util::{egui::LynId, project::Project, types::WithId};
+use lyn_util::{egui::LynId, project::Project};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use serde::{Deserialize, Serialize};
@@ -208,12 +207,6 @@ impl CentralState {
 
     pub fn ws_streams_iter_mut(&self) -> IterMut<'_, LynId, WebSocket<TcpStream>> {
         self.listener.ws_streams.iter_mut()
-    }
-    pub fn ws_streams_get(&self, id: LynId) -> Option<Ref<'_, LynId, WebSocket<TcpStream>>> {
-        self.listener.ws_streams.get(&id)
-    }
-    pub fn ws_streams_get_mut(&self, id: LynId) -> Option<RefMut<'_, LynId, WebSocket<TcpStream>>> {
-        self.listener.ws_streams.get_mut(&id)
     }
     pub fn ws_streams_add(&self, ws: WebSocket<TcpStream>) {
         self.listener.ws_streams.insert(LynId::obtain(), ws);

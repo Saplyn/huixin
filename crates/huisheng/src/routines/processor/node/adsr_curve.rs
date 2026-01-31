@@ -1,10 +1,7 @@
 use egui_snarl::{NodeId, Snarl};
 
 use crate::{
-    model::patch::{
-        Number,
-        node::{PatchNode, PatchNodeTrait, adsr_curve::ADSRCurve},
-    },
+    model::patch::node::{PatchNode, PatchNodeTrait, adsr_curve::ADSRCurve},
     node_or_bail,
     routines::processor::node::PatchNodeProcessable,
 };

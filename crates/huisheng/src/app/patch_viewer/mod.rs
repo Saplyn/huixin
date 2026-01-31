@@ -230,18 +230,18 @@ impl SnarlViewer<NodeType> for PatchViewer {
                 self.insert_node(snarl, pos, PatchNode::Number(NumberNode::new()));
                 ui.close();
             }
-            if ui.button("文字").clicked() {
-                ui.close();
-            }
+            // if ui.button("文字").clicked() {
+            //     ui.close();
+            // }
             if ui.button(BangNode::NAME).clicked() {
                 self.insert_node(snarl, pos, PatchNode::Bang(BangNode::new()));
                 ui.close();
             }
         });
         ui.menu_button("算数", |ui| {
-            if ui.button("表达式").clicked() {
-                ui.close();
-            }
+            // if ui.button("表达式").clicked() {
+            //     ui.close();
+            // }
             if ui.button(ADSRCurve::NAME).clicked() {
                 self.insert_node(snarl, pos, PatchNode::ADSRCurve(ADSRCurve::new().into()));
                 ui.close();
@@ -252,9 +252,9 @@ impl SnarlViewer<NodeType> for PatchViewer {
             }
         });
         ui.menu_button("整波", |ui| {
-            if ui.button("加波器").clicked() {
-                ui.close();
-            }
+            // if ui.button("加波器").clicked() {
+            //     ui.close();
+            // }
             if ui.button(AmpMultiplier::NAME).clicked() {
                 self.insert_node(
                     snarl,
@@ -263,15 +263,15 @@ impl SnarlViewer<NodeType> for PatchViewer {
                 );
                 ui.close();
             }
-            if ui.button("移幅器").clicked() {
-                ui.close();
-            }
-            if ui.button("倍幅器").clicked() {
-                ui.close();
-            }
-            if ui.button("限幅器").clicked() {
-                ui.close();
-            }
+            // if ui.button("移幅器").clicked() {
+            //     ui.close();
+            // }
+            // if ui.button("倍幅器").clicked() {
+            //     ui.close();
+            // }
+            // if ui.button("限幅器").clicked() {
+            //     ui.close();
+            // }
         });
         ui.menu_button("通讯", |ui| {
             if ui.button(RemoteData::NAME).clicked() {

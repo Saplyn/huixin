@@ -11,7 +11,7 @@ use egui::{TextBuffer, containers::menu::MenuButton};
 use egui_dnd::dnd;
 use egui_snarl::ui::{PinPlacement, SnarlStyle, SnarlWidget};
 use log::warn;
-use lyn_util::{egui::text_color, persist::AppStore, types::WithId};
+use lyn_util::{egui::text_color, persist::AppStore};
 use parking_lot::RwLock;
 
 use crate::{

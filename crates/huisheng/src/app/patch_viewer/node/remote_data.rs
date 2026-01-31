@@ -5,10 +5,7 @@ use crate::{
         NodeType,
         constants::{input_pin, output_pin},
     },
-    model::{
-        data_mem::NonBlockData,
-        patch::node::{PatchNode, PatchNodeTrait, bang::BangNode, remote_data::RemoteData},
-    },
+    model::patch::node::{PatchNode, remote_data::RemoteData},
 };
 
 // LYN: Public Interface
@@ -88,9 +85,9 @@ fn input_prop(pin: &egui_snarl::InPin, ui: &mut egui::Ui, snarl: &mut Snarl<Patc
 }
 
 fn output_data(
-    pin: &egui_snarl::OutPin,
+    _pin: &egui_snarl::OutPin,
     ui: &mut egui::Ui,
-    snarl: &mut Snarl<PatchNode>,
+    _snarl: &mut Snarl<PatchNode>,
 ) -> PinInfo {
     ui.label("数据");
 
@@ -98,9 +95,9 @@ fn output_data(
 }
 
 fn output_bang(
-    pin: &egui_snarl::OutPin,
+    _pin: &egui_snarl::OutPin,
     ui: &mut egui::Ui,
-    snarl: &mut Snarl<PatchNode>,
+    _snarl: &mut Snarl<PatchNode>,
 ) -> PinInfo {
     ui.label("触发");
 
