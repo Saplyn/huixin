@@ -4,7 +4,7 @@ use crate::{
     app::{
         helpers::WidgetId,
         patch_viewer::{
-            NodeType,
+            NodeTy,
             constants::{input_pin, output_pin},
         },
     },
@@ -21,7 +21,7 @@ impl Oscillator {
     pub fn pin_input(
         pin: &egui_snarl::InPin,
         ui: &mut egui::Ui,
-        snarl: &mut Snarl<NodeType>,
+        snarl: &mut Snarl<NodeTy>,
         index: usize,
     ) -> PinInfo {
         match index {
@@ -37,7 +37,7 @@ impl Oscillator {
     pub fn pin_output(
         pin: &egui_snarl::OutPin,
         ui: &mut egui::Ui,
-        snarl: &mut Snarl<NodeType>,
+        snarl: &mut Snarl<NodeTy>,
         index: usize,
     ) -> PinInfo {
         match index {
@@ -52,7 +52,7 @@ impl Oscillator {
 type This = Oscillator;
 
 #[inline(always)]
-fn input_freq(pin: &egui_snarl::InPin, ui: &mut egui::Ui, snarl: &mut Snarl<NodeType>) -> PinInfo {
+fn input_freq(pin: &egui_snarl::InPin, ui: &mut egui::Ui, snarl: &mut Snarl<NodeTy>) -> PinInfo {
     let PatchNode::Oscillator(osc) = &mut snarl[pin.id.node] else {
         unreachable!();
     };
@@ -76,7 +76,7 @@ fn input_freq(pin: &egui_snarl::InPin, ui: &mut egui::Ui, snarl: &mut Snarl<Node
 }
 
 #[inline(always)]
-fn input_phase(pin: &egui_snarl::InPin, ui: &mut egui::Ui, snarl: &mut Snarl<NodeType>) -> PinInfo {
+fn input_phase(pin: &egui_snarl::InPin, ui: &mut egui::Ui, snarl: &mut Snarl<NodeTy>) -> PinInfo {
     let PatchNode::Oscillator(osc) = &mut snarl[pin.id.node] else {
         unreachable!();
     };
@@ -106,7 +106,7 @@ fn input_phase(pin: &egui_snarl::InPin, ui: &mut egui::Ui, snarl: &mut Snarl<Nod
 fn input_waveform(
     pin: &egui_snarl::InPin,
     ui: &mut egui::Ui,
-    snarl: &mut Snarl<NodeType>,
+    snarl: &mut Snarl<NodeTy>,
 ) -> PinInfo {
     let PatchNode::Oscillator(osc) = &mut snarl[pin.id.node] else {
         unreachable!();
@@ -137,7 +137,7 @@ fn input_waveform(
 }
 
 #[inline(always)]
-fn input_reset(pin: &egui_snarl::InPin, ui: &mut egui::Ui, snarl: &mut Snarl<NodeType>) -> PinInfo {
+fn input_reset(pin: &egui_snarl::InPin, ui: &mut egui::Ui, snarl: &mut Snarl<NodeTy>) -> PinInfo {
     let PatchNode::Oscillator(osc) = &mut snarl[pin.id.node] else {
         unreachable!();
     };
@@ -155,10 +155,6 @@ fn input_reset(pin: &egui_snarl::InPin, ui: &mut egui::Ui, snarl: &mut Snarl<Nod
 }
 
 #[inline(always)]
-fn output_block(
-    _pin: &egui_snarl::OutPin,
-    _ui: &mut egui::Ui,
-    _snarl: &Snarl<NodeType>,
-) -> PinInfo {
+fn output_block(_pin: &egui_snarl::OutPin, _ui: &mut egui::Ui, _snarl: &Snarl<NodeTy>) -> PinInfo {
     output_pin(This::OUTPUT_TYPE[This::OUTPUT_BLOCK])
 }

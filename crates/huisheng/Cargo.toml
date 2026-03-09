@@ -20,6 +20,7 @@ rfd = { workspace = true, features = ["default"] }
 # Media
 dasp = { version = "0.11", features = ["all"] }
 cpal = "0.17"
+evalexpr = { version = "13.1", features = ["serde"] }
 # Logging
 log = { workspace = true }
 simplelog = { workspace = true, features = ["termcolor"] }

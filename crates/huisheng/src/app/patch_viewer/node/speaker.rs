@@ -1,7 +1,7 @@
 use egui_snarl::{Snarl, ui::PinInfo};
 
 use crate::{
-    app::patch_viewer::{NodeType, constants::input_pin},
+    app::patch_viewer::{NodeTy, constants::input_pin},
     model::patch::node::speaker::Speaker,
 };
 
@@ -12,7 +12,7 @@ impl Speaker {
     pub fn pin_input(
         pin: &egui_snarl::InPin,
         ui: &mut egui::Ui,
-        snarl: &mut Snarl<NodeType>,
+        snarl: &mut Snarl<NodeTy>,
         index: usize,
     ) -> PinInfo {
         match index {
@@ -26,7 +26,7 @@ impl Speaker {
     pub fn pin_output(
         _pin: &egui_snarl::OutPin,
         _ui: &mut egui::Ui,
-        _snarl: &mut Snarl<NodeType>,
+        _snarl: &mut Snarl<NodeTy>,
         _index: usize,
     ) -> PinInfo {
         unreachable!("speaker has {} outputs", Self::OUTPUTS);
@@ -39,7 +39,7 @@ impl Speaker {
 fn input_left_chan(
     _pin: &egui_snarl::InPin,
     ui: &mut egui::Ui,
-    _snarl: &mut Snarl<NodeType>,
+    _snarl: &mut Snarl<NodeTy>,
 ) -> PinInfo {
     ui.label("左声道");
 
@@ -53,7 +53,7 @@ fn input_left_chan(
 fn input_right_chan(
     _pin: &egui_snarl::InPin,
     ui: &mut egui::Ui,
-    _snarl: &mut Snarl<NodeType>,
+    _snarl: &mut Snarl<NodeTy>,
 ) -> PinInfo {
     ui.label("右声道");
 

@@ -10,9 +10,9 @@ use crate::{
             Number, WireDataType,
             node::{
                 PatchNodeTrait, PatchNodeType, adsr_curve::ADSRCurve,
-                amp_multiplier::AmpMultiplier, bang::BangNode, midi_to_freq::MidiToFreq,
-                number::NumberNode, oscillator::Oscillator, remote_data::RemoteData,
-                speaker::Speaker,
+                amp_multiplier::AmpMultiplier, bang::BangNode, expression::Expression,
+                midi_to_freq::MidiToFreq, number::NumberNode, oscillator::Oscillator,
+                remote_data::RemoteData, speaker::Speaker,
             },
         },
         state::CentralState,
@@ -92,6 +92,9 @@ pub fn main(state: Arc<CentralState>, cmd_rx: mpsc::Receiver<Command>) -> ! {
                 // Calculation
                 PatchNodeType::ADSRCurve => {
                     ADSRCurve::process(node_id, &mut patch_guard.snarl, sample_rate)
+                }
+                PatchNodeType::Expression => {
+                    Expression::process(node_id, &mut patch_guard.snarl, ())
                 }
                 PatchNodeType::MidiToFreq => {
                     MidiToFreq::process(node_id, &mut patch_guard.snarl, ())

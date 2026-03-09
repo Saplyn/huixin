@@ -2,7 +2,7 @@ use egui_snarl::{Snarl, ui::PinInfo};
 
 use crate::{
     app::patch_viewer::{
-        NodeType,
+        NodeTy,
         constants::{input_pin, output_pin},
     },
     model::patch::node::{PatchNode, adsr_curve::ADSRCurve},
@@ -15,7 +15,7 @@ impl ADSRCurve {
     pub fn pin_input(
         pin: &egui_snarl::InPin,
         ui: &mut egui::Ui,
-        snarl: &mut Snarl<NodeType>,
+        snarl: &mut Snarl<NodeTy>,
         index: usize,
     ) -> PinInfo {
         match index {
@@ -34,7 +34,7 @@ impl ADSRCurve {
     pub fn pin_output(
         pin: &egui_snarl::OutPin,
         ui: &mut egui::Ui,
-        snarl: &mut Snarl<NodeType>,
+        snarl: &mut Snarl<NodeTy>,
         index: usize,
     ) -> PinInfo {
         match index {

@@ -11,8 +11,9 @@ use crate::model::{
         WireDataType,
         node::{
             PatchNode, PatchNodeTrait, PatchNodeType, adsr_curve::ADSRCurve,
-            amp_multiplier::AmpMultiplier, bang::BangNode, midi_to_freq::MidiToFreq,
-            number::NumberNode, oscillator::Oscillator, remote_data::RemoteData, speaker::Speaker,
+            amp_multiplier::AmpMultiplier, bang::BangNode, expression::Expression,
+            midi_to_freq::MidiToFreq, number::NumberNode, oscillator::Oscillator,
+            remote_data::RemoteData, speaker::Speaker,
         },
     },
     state::CentralState,
@@ -43,13 +44,13 @@ impl PatchViewer {
     }
 
     #[inline(always)]
-    fn insert_node(&mut self, snarl: &mut Snarl<NodeType>, pos: egui::Pos2, node: PatchNode) {
+    fn insert_node(&mut self, snarl: &mut Snarl<NodeTy>, pos: egui::Pos2, node: PatchNode) {
         snarl.insert_node(pos, node);
         self.output.rebuild = true;
     }
 
     #[inline(always)]
-    fn remove_node(&mut self, snarl: &mut Snarl<NodeType>, node: egui_snarl::NodeId) {
+    fn remove_node(&mut self, snarl: &mut Snarl<NodeTy>, node: egui_snarl::NodeId) {
         snarl.remove_node(node);
         self.output.rebuild = true;
     }
@@ -59,7 +60,7 @@ impl PatchViewer {
         &mut self,
         from: &egui_snarl::OutPin,
         to: &egui_snarl::InPin,
-        snarl: &mut Snarl<NodeType>,
+        snarl: &mut Snarl<NodeTy>,
     ) {
         // refuse self-connection
         if from.id.node == to.id.node {
@@ -106,7 +107,7 @@ impl PatchViewer {
         &mut self,
         from: &egui_snarl::OutPin,
         to: &egui_snarl::InPin,
-        snarl: &mut Snarl<NodeType>,
+        snarl: &mut Snarl<NodeTy>,
     ) {
         snarl.disconnect(from.id, to.id);
         snarl[to.id.node].drop_input(to.id.input, from.id);
@@ -116,18 +117,18 @@ impl PatchViewer {
     }
 }
 
-type NodeType = PatchNode;
+type NodeTy = PatchNode;
 
-impl SnarlViewer<NodeType> for PatchViewer {
+impl SnarlViewer<NodeTy> for PatchViewer {
     // LYN: Node Basic Information
 
-    fn title(&mut self, node: &NodeType) -> String {
+    fn title(&mut self, node: &NodeTy) -> String {
         node.name().to_string()
     }
-    fn inputs(&mut self, node: &NodeType) -> usize {
+    fn inputs(&mut self, node: &NodeTy) -> usize {
         node.inputs()
     }
-    fn outputs(&mut self, node: &NodeType) -> usize {
+    fn outputs(&mut self, node: &NodeTy) -> usize {
         node.outputs()
     }
 
@@ -139,7 +140,7 @@ impl SnarlViewer<NodeType> for PatchViewer {
         _inputs: &[egui_snarl::InPin],
         _outputs: &[egui_snarl::OutPin],
         ui: &mut egui::Ui,
-        snarl: &mut Snarl<NodeType>,
+        snarl: &mut Snarl<NodeTy>,
     ) {
         ui.add_enabled(
             false,
@@ -155,7 +156,7 @@ impl SnarlViewer<NodeType> for PatchViewer {
         &mut self,
         pin: &egui_snarl::InPin,
         ui: &mut egui::Ui,
-        snarl: &mut Snarl<NodeType>,
+        snarl: &mut Snarl<NodeTy>,
     ) -> impl SnarlPin + 'static {
         match snarl[pin.id.node].get_type() {
             // Signal
@@ -167,6 +168,7 @@ impl SnarlViewer<NodeType> for PatchViewer {
             PatchNodeType::Bang => BangNode::pin_input(pin, ui, snarl, pin.id.input),
 
             // Calculation
+            PatchNodeType::Expression => Expression::pin_input(pin, ui, snarl, pin.id.input),
             PatchNodeType::ADSRCurve => ADSRCurve::pin_input(pin, ui, snarl, pin.id.input),
             PatchNodeType::MidiToFreq => MidiToFreq::pin_input(pin, ui, snarl, pin.id.input),
 
@@ -184,7 +186,7 @@ impl SnarlViewer<NodeType> for PatchViewer {
         &mut self,
         pin: &egui_snarl::OutPin,
         ui: &mut egui::Ui,
-        snarl: &mut Snarl<NodeType>,
+        snarl: &mut Snarl<NodeTy>,
     ) -> impl SnarlPin + 'static {
         match snarl[pin.id.node].get_type() {
             // Signal
@@ -192,6 +194,7 @@ impl SnarlViewer<NodeType> for PatchViewer {
             PatchNodeType::Speaker => Speaker::pin_output(pin, ui, snarl, pin.id.output),
 
             // Variable
+            PatchNodeType::Expression => Expression::pin_output(pin, ui, snarl, pin.id.output),
             PatchNodeType::Number => NumberNode::pin_output(pin, ui, snarl, pin.id.output),
             PatchNodeType::Bang => BangNode::pin_output(pin, ui, snarl, pin.id.output),
 
@@ -211,10 +214,10 @@ impl SnarlViewer<NodeType> for PatchViewer {
 
     // LYN: Graph Right Click Menu
 
-    fn has_graph_menu(&mut self, _pos: egui::Pos2, _snarl: &mut Snarl<NodeType>) -> bool {
+    fn has_graph_menu(&mut self, _pos: egui::Pos2, _snarl: &mut Snarl<NodeTy>) -> bool {
         true
     }
-    fn show_graph_menu(&mut self, pos: egui::Pos2, ui: &mut egui::Ui, snarl: &mut Snarl<NodeType>) {
+    fn show_graph_menu(&mut self, pos: egui::Pos2, ui: &mut egui::Ui, snarl: &mut Snarl<NodeTy>) {
         ui.menu_button("信号", |ui| {
             if ui.button(Oscillator::NAME).clicked() {
                 self.insert_node(snarl, pos, PatchNode::Oscillator(Oscillator::new().into()));
@@ -239,9 +242,10 @@ impl SnarlViewer<NodeType> for PatchViewer {
             }
         });
         ui.menu_button("算数", |ui| {
-            // if ui.button("表达式").clicked() {
-            //     ui.close();
-            // }
+            if ui.button("表达式").clicked() {
+                self.insert_node(snarl, pos, PatchNode::Expression(Expression::new()));
+                ui.close();
+            }
             if ui.button(ADSRCurve::NAME).clicked() {
                 self.insert_node(snarl, pos, PatchNode::ADSRCurve(ADSRCurve::new().into()));
                 ui.close();
@@ -288,7 +292,7 @@ impl SnarlViewer<NodeType> for PatchViewer {
         &mut self,
         from: &egui_snarl::OutPin,
         to: &egui_snarl::InPin,
-        snarl: &mut Snarl<NodeType>,
+        snarl: &mut Snarl<NodeTy>,
     ) {
         self.connect_node(from, to, snarl);
     }
@@ -297,7 +301,7 @@ impl SnarlViewer<NodeType> for PatchViewer {
         &mut self,
         from: &egui_snarl::OutPin,
         to: &egui_snarl::InPin,
-        snarl: &mut Snarl<NodeType>,
+        snarl: &mut Snarl<NodeTy>,
     ) {
         self.disconnect_node(from, to, snarl);
     }
@@ -307,7 +311,7 @@ impl SnarlViewer<NodeType> for PatchViewer {
     fn has_dropped_wire_menu(
         &mut self,
         src_pins: egui_snarl::ui::AnyPins,
-        snarl: &mut Snarl<NodeType>,
+        snarl: &mut Snarl<NodeTy>,
     ) -> bool {
         false
     }
@@ -316,14 +320,14 @@ impl SnarlViewer<NodeType> for PatchViewer {
         pos: egui::Pos2,
         ui: &mut egui::Ui,
         src_pins: egui_snarl::ui::AnyPins,
-        snarl: &mut Snarl<NodeType>,
+        snarl: &mut Snarl<NodeTy>,
     ) {
         todo!("called when dragging one pin's wire to empty canvas")
     }
 
     // LYN: Right-Click Node Menu
 
-    fn has_node_menu(&mut self, _node: &NodeType) -> bool {
+    fn has_node_menu(&mut self, _node: &NodeTy) -> bool {
         true
     }
     fn show_node_menu(
@@ -332,7 +336,7 @@ impl SnarlViewer<NodeType> for PatchViewer {
         _inputs: &[egui_snarl::InPin],
         _outputs: &[egui_snarl::OutPin],
         ui: &mut egui::Ui,
-        snarl: &mut Snarl<NodeType>,
+        snarl: &mut Snarl<NodeTy>,
     ) {
         if ui.button("删除").clicked() {
             self.remove_node(snarl, node);
